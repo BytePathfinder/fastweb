@@ -1,0 +1,101 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: fastweb
+  profiles:
+    active: dev
+  
+  # 数据源配置（示例）
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  
+  # H2 控制台配置
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  # JPA 配置
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+# FastWeb 配置
+fastweb:
+  infra:
+    core:
+      enabled: true
+      application-name: fastweb
+      environment:
+        name: dev
+        production: false
+    
+    web:
+      enabled: true
+      api-log:
+        enabled: true
+        log-request-body: true
+        log-response-body: true
+        max-log-length: 1000
+      cors:
+        enabled: true
+        allowed-origins: ["*"]
+        allowed-methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        allowed-headers: ["*"]
+        allow-credentials: true
+    
+    security:
+      enabled: true
+      jwt:
+        secret: fastweb-jwt-secret-key-2024
+        expiration: 86400
+        refresh-expiration: 604800
+        token-prefix: "Bearer "
+        header-name: "Authorization"
+      password:
+        min-length: 6
+        max-length: 20
+        require-digit: true
+        require-letter: true
+        require-special-char: false
+    
+    data:
+      enabled: true
+      pagination:
+        default-page-size: 20
+        max-page-size: 1000
+      audit:
+        enabled: true
+        create-time-field: createTime
+        update-time-field: updateTime
+        create-by-field: createBy
+        update-by-field: updateBy
+
+# 日志配置
+logging:
+  level:
+    com.company.fastweb: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{requestId}] %logger{36} - %msg%n"
+
+# 管理端点配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

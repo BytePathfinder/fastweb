@@ -11,7 +11,12 @@
     <packaging>jar</packaging>
 
     <description>
-        Common library for FastWebApp.
+        通用工具模块
+        - 无业务 ：纯工具性质的代码，不包含业务逻辑
+        - 无依赖 ：不依赖任何持久化框架
+        - 无状态 ：只是常量和工具方法的集合
+
+        仅提供常用的工具类，如日期工具、字符串工具、枚举工具、常量工具、异常工具等
     </description>
 
     <properties>
@@ -19,12 +24,6 @@
     </properties>
 
     <dependencies>
-        <!-- MyBatis-Plus -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-        </dependency>
-
         <!-- Jackson -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -36,6 +35,12 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
+        </dependency>
+
+        <!-- SLF4J API -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
 
         <!-- Validation -->

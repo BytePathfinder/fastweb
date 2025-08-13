@@ -1,19 +1,102 @@
-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    
     <parent>
         <groupId>com.company</groupId>
         <artifactId>fastweb</artifactId>
         <version>1.0.0</version>
     </parent>
-
+    
     <artifactId>core</artifactId>
     <packaging>pom</packaging>
-
+    <name>Framework Core Layer</name>
+    <description>框架核心层</description>
+    
     <modules>
-        <module>adapter</module>
-        <module>infra</module>
         <module>common</module>
+        <module>infra</module>
+        <module>starter</module>
     </modules>
-
+    
+    <dependencyManagement>
+        <dependencies>
+            <!-- Common Module -->
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <!-- Infra Modules -->
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>infra-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>infra-data</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>infra-web</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>infra-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>infra-cache</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>infra-messaging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>infra-job</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <!-- Starter Modules -->
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>web-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>data-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>security-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>cache-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 </project>
