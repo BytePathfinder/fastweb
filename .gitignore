@@ -3,6 +3,8 @@
 
 # Log file
 *.log
+*.log.*
+logs/
 
 # BlueJ files
 *.ctxt
@@ -19,24 +21,19 @@
 *.tar.gz
 *.rar
 
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+replay_pid*
+
 # Maven
 target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 
 # Gradle
 .gradle
 build/
-gradle-app.setting
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
@@ -46,32 +43,7 @@ gradle-app.setting
 *.iws
 *.iml
 *.ipr
-.idea/dictionaries/
-.idea/libraries/
-.idea/shelf/
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/datasources.xml
-.idea/dataSources.ids
-.idea/sqlDataSources.xml
-.idea/dynamic.xml
-.idea/uiDesigner.xml
-.idea/dbnavigator.xml
-.idea/httpRequests/
-.idea/caches/
-.idea/compiler.xml
-.idea/encodings.xml
-.idea/jarRepositories.xml
-.idea/misc.xml
-.idea/modules.xml
-.idea/scopes/
-.idea/vcs.xml
-.idea/jsLibraryMappings.xml
-.idea/sonarlint/
-.idea/checkstyle-idea.xml
-.idea/findbugs-idea.xml
-.idea/codeStyles/
-.idea/inspectionProfiles/
+.idea_modules/
 
 # Eclipse
 .apt_generated
@@ -81,16 +53,6 @@ gradle-app.setting
 .settings
 .springBeans
 .sts4-cache
-bin/
-tmp/
-.metadata
-*.tmp
-*.bak
-*.swp
-*~.nib
-local.properties
-.loadpath
-.recommenders
 
 # NetBeans
 /nbproject/private/
@@ -101,74 +63,32 @@ local.properties
 
 # VS Code
 .vscode/
-.vscode/settings.json
-.vscode/tasks.json
-.vscode/launch.json
-.vscode/extensions.json
 
-# OS generated files
+# Mac OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
+
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Spring Boot
+*.pid
+*.port
 spring-boot-*.log
+
+# Application
+application-local.yml
 
 # Logs
 logs/
 *.log
 *.log.*
 
-# Runtime files
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Optional npm cache directory
-.npm
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Docker
-.dockerignore
-
-# Docker Compose
-*.override.yml
-
 # Temporary files
 *.tmp
 *.temp
+*.bak
 *.swp
 *.swo
 *~
@@ -178,31 +98,38 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 
-# Redis dump file
-dump.rdb
+# Docker
+.dockerignore
 
-# Lombok
-.delombok
+# Node.js (if using frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# JRebel
-rebel.xml
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# Application specific
-application-local.yml
-application-dev.yml
-application-test.yml
-application-prod.yml
-logs/
-temp/
-tmp/
+# Upload files
 upload/
-file-upload/
+uploads/
 static/upload/
+static/uploads/
+
+# Generated files
+generated/
 
 # Test reports
-test-results/
-test-output/
+surefire-reports/
+jacoco.exec
 
-# Maven wrapper (if not using)
-!.mvn/wrapper/maven-wrapper.jar
-!.mvn/wrapper/maven-wrapper.properties
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
