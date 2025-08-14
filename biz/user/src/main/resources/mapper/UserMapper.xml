@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.fastweb.biz.user.mapper.UserMapper">
+
+    <!-- 用户结果映射 -->
+    <resultMap id="UserResultMap" type="com.company.fastweb.biz.user.entity.User">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="password" property="password"/>
+        <result column="email" property="email"/>
+        <result column="phone" property="phone"/>
+        <result column="real_name" property="realName"/>
+        <result column="nickname" property="nickname"/>
+        <result column="avatar" property="avatar"/>
+        <result column="gender" property="gender"/>
+        <result column="birthday" property="birthday"/>
+        <result column="status" property="status"/>
+        <result column="enabled" property="enabled"/>
+        <result column="account_non_expired" property="accountNonExpired"/>
+        <result column="account_non_locked" property="accountNonLocked"/>
+        <result column="credentials_non_expired" property="credentialsNonExpired"/>
+        <result column="last_login_time" property="lastLoginTime"/>
+        <result column="last_login_ip" property="lastLoginIp"/>
+        <result column="login_count" property="loginCount"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="create_by" property="createBy"/>
+        <result column="update_by" property="updateBy"/>
+        
+        <!-- 角色集合映射 -->
+        <collection property="roles" ofType="com.company.fastweb.biz.user.entity.Role">
+            <id column="role_id" property="id"/>
+            <result column="role_code" property="code"/>
+            <result column="role_name" property="name"/>
+            <result column="role_description" property="description"/>
+            <result column="role_status" property="status"/>
+            <result column="role_sort" property="sort"/>
+            
+            <!-- 角色权限集合映射 -->
+            <collection property="permissions" ofType="com.company.fastweb.biz.user.entity.Permission">
+                <id column="permission_id" property="id"/>
+                <result column="permission_code" property="code"/>
+                <result column="permission_name" property="name"/>
+                <result column="permission_description" property="description"/>
+                <result column="permission_type" property="type"/>
+                <result column="permission_parent_id" property="parentId"/>
+                <result column="permission_path" property="path"/>
+                <result column="permission_url" property="url"/>
+                <result column="permission_method" property="method"/>
+                <result column="permission_status" property="status"/>
+                <result column="permission_sort" property="sort"/>
+            </collection>
+        </collection>
+        
+        <!-- 用户权限集合映射 -->
+        <collection property="permissions" ofType="com.company.fastweb.biz.user.entity.Permission">
+            <id column="user_permission_id" property="id"/>
+            <result column="user_permission_code" property="code"/>
+            <result column="user_permission_name" property="name"/>
+            <result column="user_permission_description" property="description"/>
+            <result column="user_permission_type" property="type"/>
+            <result column="user_permission_parent_id" property="parentId"/>
+            <result column="user_permission_path" property="path"/>
+            <result column="user_permission_url" property="url"/>
+            <result column="user_permission_method" property="method"/>
+            <result column="user_permission_status" property="status"/>
+            <result column="user_permission_sort" property="sort"/>
+        </collection>
+    </resultMap>
+
+    <!-- 基础SQL片段 -->
+    <sql id="Base_Column_List">
+        u.id, u.username, u.password, u.email, u.phone, u.real_name, u.nickname, u.avatar,
+        u.gender, u.birthday, u.status, u.enabled, u.account_non_expired, u.account_non_locked,
+        u.credentials_non_expired, u.last_login_time, u.last_login_ip, u.login_count,
+        u.create_time, u.update_time, u.create_by, u.update_by
+    </sql>
+
+    <!-- 角色权限SQL片段 -->
+    <sql id="Role_Permission_Column_List">
+        r.id as role_id, r.code as role_code, r.name as role_name, r.description as role_description,
+        r.status as role_status, r.sort as role_sort,
+        rp.id as permission_id, rp.code as permission_code, rp.name as permission_name,
+        rp.description as permission_description, rp.type as permission_type,
+        rp.parent_id as permission_parent_id, rp.path as permission_path, rp.url as permission_url,
+        rp.method as permission_method, rp.status as permission_status, rp.sort as permission_sort
+    </sql>
+
+    <!-- 用户权限SQL片段 -->
+    <sql id="User_Permission_Column_List">
+        up.id as user_permission_id, up.code as user_permission_code, up.name as user_permission_name,
+        up.description as user_permission_description, up.type as user_permission_type,
+        up.parent_id as user_permission_parent_id, up.path as user_permission_path,
+        up.url as user_permission_url, up.method as user_permission_method,
+        up.status as user_permission_status, up.sort as user_permission_sort
+    </sql>
+
+    <!-- 根据用户名查找用户（包含角色和权限信息） -->
+    <select id="findByUsername" resultMap="UserResultMap">
+        SELECT
+            <include refid="Base_Column_List"/>,
+            <include refid="Role_Permission_Column_List"/>,
+            <include refid="User_Permission_Column_List"/>
+        FROM sys_user u
+        LEFT JOIN sys_user_role ur ON u.id = ur.user_id
+        LEFT JOIN sys_role r ON ur.role_id = r.id AND r.status = 0
+        LEFT JOIN sys_role_permission rpr ON r.id = rpr.role_id
+        LEFT JOIN sys_permission rp ON rpr.permission_id = rp.id AND rp.status = 0
+        LEFT JOIN sys_user_permission upr ON u.id = upr.user_id
+        LEFT JOIN sys_permission up ON upr.permission_id = up.id AND up.status = 0
+        WHERE u.username = #{username}
+        AND u.status = 0
+    </select>
+
+    <!-- 根据用户ID查找用户（包含角色和权限信息） -->
+    <select id="findById" resultMap="UserResultMap">
+        SELECT
+            <include refid="Base_Column_List"/>,
+            <include refid="Role_Permission_Column_List"/>,
+            <include refid="User_Permission_Column_List"/>
+        FROM sys_user u
+        LEFT JOIN sys_user_role ur ON u.id = ur.user_id
+        LEFT JOIN sys_role r ON ur.role_id = r.id AND r.status = 0
+        LEFT JOIN sys_role_permission rpr ON r.id = rpr.role_id
+        LEFT JOIN sys_permission rp ON rpr.permission_id = rp.id AND rp.status = 0
+        LEFT JOIN sys_user_permission upr ON u.id = upr.user_id
+        LEFT JOIN sys_permission up ON upr.permission_id = up.id AND up.status = 0
+        WHERE u.id = #{id}
+        AND u.status = 0
+    </select>
+
+    <!-- 根据邮箱查找用户 -->
+    <select id="findByEmail" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user u
+        WHERE u.email = #{email}
+        AND u.status = 0
+    </select>
+
+    <!-- 根据手机号查找用户 -->
+    <select id="findByPhone" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user u
+        WHERE u.phone = #{phone}
+        AND u.status = 0
+    </select>
+
+    <!-- 插入用户 -->
+    <insert id="insert" parameterType="com.company.fastweb.biz.user.entity.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_user (
+            username, password, email, phone, real_name, nickname, avatar, gender, birthday,
+            status, enabled, account_non_expired, account_non_locked, credentials_non_expired,
+            last_login_time, last_login_ip, login_count, create_time, update_time, create_by, update_by
+        ) VALUES (
+            #{username}, #{password}, #{email}, #{phone}, #{realName}, #{nickname}, #{avatar},
+            #{gender}, #{birthday}, #{status}, #{enabled}, #{accountNonExpired}, #{accountNonLocked},
+            #{credentialsNonExpired}, #{lastLoginTime}, #{lastLoginIp}, #{loginCount},
+            #{createTime}, #{updateTime}, #{createBy}, #{updateBy}
+        )
+    </insert>
+
+    <!-- 更新用户 -->
+    <update id="update" parameterType="com.company.fastweb.biz.user.entity.User">
+        UPDATE sys_user
+        <set>
+            <if test="password != null">password = #{password},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="realName != null">real_name = #{realName},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="avatar != null">avatar = #{avatar},</if>
+            <if test="gender != null">gender = #{gender},</if>
+            <if test="birthday != null">birthday = #{birthday},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="accountNonExpired != null">account_non_expired = #{accountNonExpired},</if>
+            <if test="accountNonLocked != null">account_non_locked = #{accountNonLocked},</if>
+            <if test="credentialsNonExpired != null">credentials_non_expired = #{credentialsNonExpired},</if>
+            <if test="lastLoginTime != null">last_login_time = #{lastLoginTime},</if>
+            <if test="lastLoginIp != null">last_login_ip = #{lastLoginIp},</if>
+            <if test="loginCount != null">login_count = #{loginCount},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID删除用户 -->
+    <delete id="deleteById">
+        DELETE FROM sys_user WHERE id = #{id}
+    </delete>
+
+    <!-- 根据用户名统计用户数量 -->
+    <select id="countByUsername" resultType="int">
+        SELECT COUNT(*) FROM sys_user WHERE username = #{username}
+    </select>
+
+    <!-- 根据邮箱统计用户数量 -->
+    <select id="countByEmail" resultType="int">
+        SELECT COUNT(*) FROM sys_user WHERE email = #{email}
+    </select>
+
+    <!-- 根据手机号统计用户数量 -->
+    <select id="countByPhone" resultType="int">
+        SELECT COUNT(*) FROM sys_user WHERE phone = #{phone}
+    </select>
+
+</mapper>
