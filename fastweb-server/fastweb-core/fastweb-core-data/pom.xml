@@ -55,6 +55,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- P6Spy SQL监控 -->
+        <dependency>
+            <groupId>p6spy</groupId>
+            <artifactId>p6spy</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- 通用依赖 -->
         <dependency>
             <groupId>org.projectlombok</groupId>

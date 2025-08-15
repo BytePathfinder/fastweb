@@ -1,0 +1,207 @@
+# FastWeb 多租户配置示例
+# 将此文件复制到您的项目中并根据实际情况修改配置
+
+spring:
+  profiles:
+    active: tenant-example
+
+fastweb:
+  data:
+    # 启用数据访问功能
+    enabled: true
+    
+    # 主数据源名称
+    primary: master
+    
+    # 数据源配置
+    datasource:
+      # 主数据源 - 存储系统配置、租户信息等
+      master:
+        url: jdbc:mysql://localhost:3306/fastweb_master?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+        username: root
+        password: password
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        hikari:
+          maximum-pool-size: 20
+          minimum-idle: 5
+          idle-timeout: 300000
+          connection-timeout: 20000
+          max-lifetime: 1200000
+          pool-name: HikariPool-Master
+      
+      # 租户1数据源
+      tenant_1001:
+        url: jdbc:mysql://localhost:3306/fastweb_tenant_1001?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+        username: tenant1
+        password: tenant1_password
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        hikari:
+          maximum-pool-size: 10
+          minimum-idle: 2
+          idle-timeout: 300000
+          connection-timeout: 20000
+          max-lifetime: 1200000
+          pool-name: HikariPool-Tenant1001
+      
+      # 租户2数据源
+      tenant_1002:
+        url: jdbc:mysql://localhost:3306/fastweb_tenant_1002?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+        username: tenant2
+        password: tenant2_password
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        hikari:
+          maximum-pool-size: 10
+          minimum-idle: 2
+          idle-timeout: 300000
+          connection-timeout: 20000
+          max-lifetime: 1200000
+          pool-name: HikariPool-Tenant1002
+    
+    # MyBatis-Plus 配置
+    mybatis-plus:
+      # Mapper XML文件位置
+      mapper-locations: classpath*:/mapper/**/*.xml
+      
+      # 实体类型别名包
+      type-aliases-package: com.company.fastweb.**.entity
+      
+      # 分页配置
+      pagination:
+        enabled: true
+        max-limit: 1000
+      
+      # 多租户配置
+      tenant:
+        # 启用多租户
+        enabled: true
+        
+        # 租户ID列名
+        tenant-id-column: tenant_id
+        
+        # 租户模式: COLUMN-字段模式, DATABASE-数据库模式, SCHEMA-Schema模式
+        tenant-mode: COLUMN
+        
+        # 忽略多租户的表名（这些表不会自动添加租户条件）
+        ignore-tables:
+          - sys_tenant          # 租户表本身
+          - sys_config          # 系统配置表
+          - sys_dict            # 数据字典表
+          - sys_dict_data       # 数据字典数据表
+          - sys_menu            # 菜单表
+          - sys_role_menu       # 角色菜单关联表
+          - sys_dept            # 部门表（如果部门跨租户共享）
+          - sys_log_login       # 登录日志表
+          - sys_log_operation   # 操作日志表
+        
+        # 忽略多租户的SQL类型（可选）
+        ignore-sql-types: []
+    
+    # 事务配置
+    transaction:
+      default-timeout: 30
+      rollback-for-any-exception: false
+    
+    # 审计配置
+    audit:
+      enabled: true
+      create-by-field: createBy
+      create-time-field: createTime
+      update-by-field: updateBy
+      update-time-field: updateTime
+
+# 日志配置
+logging:
+  level:
+    com.company.fastweb: DEBUG
+    com.baomidou.mybatisplus: DEBUG
+    org.springframework.jdbc: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{tenantId}] %logger{50} - %msg%n"
+
+---
+# 数据库模式配置示例
+spring:
+  profiles: tenant-database-mode
+
+fastweb:
+  data:
+    mybatis-plus:
+      tenant:
+        enabled: true
+        tenant-mode: DATABASE  # 使用数据库模式
+        tenant-id-column: tenant_id
+        ignore-tables:
+          - sys_tenant
+          - sys_config
+
+---
+# Schema模式配置示例
+spring:
+  profiles: tenant-schema-mode
+
+fastweb:
+  data:
+    mybatis-plus:
+      tenant:
+        enabled: true
+        tenant-mode: SCHEMA    # 使用Schema模式
+        tenant-id-column: tenant_id
+        ignore-tables:
+          - sys_tenant
+          - sys_config
+
+---
+# 开发环境配置
+spring:
+  profiles: dev
+
+fastweb:
+  data:
+    datasource:
+      master:
+        url: jdbc:h2:mem:fastweb_master;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+        username: sa
+        password: 
+        driver-class-name: org.h2.Driver
+      tenant_1001:
+        url: jdbc:h2:mem:fastweb_tenant_1001;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+        username: sa
+        password: 
+        driver-class-name: org.h2.Driver
+
+# H2数据库控制台配置
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+---
+# 生产环境配置
+spring:
+  profiles: prod
+
+fastweb:
+  data:
+    datasource:
+      master:
+        url: jdbc:mysql://prod-mysql-master:3306/fastweb_master?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+        username: ${DB_MASTER_USERNAME:fastweb_master}
+        password: ${DB_MASTER_PASSWORD:}
+        hikari:
+          maximum-pool-size: 50
+          minimum-idle: 10
+      tenant_1001:
+        url: jdbc:mysql://prod-mysql-tenant1:3306/fastweb_tenant_1001?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+        username: ${DB_TENANT1_USERNAME:fastweb_tenant1}
+        password: ${DB_TENANT1_PASSWORD:}
+        hikari:
+          maximum-pool-size: 30
+          minimum-idle: 5
+
+# 生产环境日志配置
+logging:
+  level:
+    com.company.fastweb: INFO
+    com.baomidou.mybatisplus: WARN
+    org.springframework.jdbc: WARN

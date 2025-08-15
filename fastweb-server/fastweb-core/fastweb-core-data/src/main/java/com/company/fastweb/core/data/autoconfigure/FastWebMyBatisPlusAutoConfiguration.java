@@ -55,17 +55,26 @@ public class FastWebMyBatisPlusAutoConfiguration {
             }
         }
         
-        // 多租户插件
+        // 多租户插件 - 优先使用tenant模块提供的处理器
         if (properties.getMybatisPlus().getTenant().isEnabled()) {
             try {
                 // 使用反射创建租户插件
                 Class<?> tenantClass = Class.forName("com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor");
                 Object tenantInterceptor = tenantClass.getDeclaredConstructor().newInstance();
                 
-                // 创建租户处理器
-                Class<?> handlerClass = Class.forName("com.company.fastweb.core.data.mybatis.FastWebTenantLineHandler");
-                Object handler = handlerClass.getConstructor(String.class)
-                    .newInstance(properties.getMybatisPlus().getTenant().getTenantIdColumn());
+                // 尝试获取tenant模块提供的处理器
+                Object handler = null;
+                try {
+                    // 优先使用tenant模块的增强版处理器
+                    Class<?> enhancedHandlerClass = Class.forName("com.company.fastweb.core.tenant.mybatis.EnhancedTenantLineHandler");
+                    handler = enhancedHandlerClass.getConstructor(properties.getClass())
+                        .newInstance(properties);
+                } catch (Exception e) {
+                    // 如果tenant模块不可用，使用data模块的简单处理器
+                    Class<?> handlerClass = Class.forName("com.company.fastweb.core.data.mybatis.FastWebTenantLineHandler");
+                    handler = handlerClass.getConstructor(String.class)
+                        .newInstance(properties.getMybatisPlus().getTenant().getTenantIdColumn());
+                }
                 
                 // 设置租户处理器
                 tenantClass.getMethod("setTenantLineHandler", Class.forName("com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler"))

@@ -130,6 +130,41 @@ public class FastWebDataProperties {
              * 租户ID列名
              */
             private String tenantIdColumn = "tenant_id";
+            
+            /**
+             * 租户模式
+             */
+            private TenantMode tenantMode = TenantMode.COLUMN;
+            
+            /**
+             * 忽略多租户的表名
+             */
+            private String[] ignoreTables = {"sys_tenant", "sys_config", "sys_dict"};
+            
+            /**
+             * 忽略多租户的SQL类型
+             */
+            private String[] ignoreSqlTypes = {};
+        }
+        
+        /**
+         * 租户模式枚举
+         */
+        public enum TenantMode {
+            /**
+             * 字段模式 - 通过字段区分租户
+             */
+            COLUMN,
+            
+            /**
+             * 数据库模式 - 不同租户使用不同数据库
+             */
+            DATABASE,
+            
+            /**
+             * Schema模式 - 不同租户使用不同Schema
+             */
+            SCHEMA
         }
     }
     
