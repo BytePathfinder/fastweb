@@ -1,0 +1,4 @@
+com.company.fastweb.core.data.autoconfigure.FastWebDataAutoConfiguration
+com.company.fastweb.core.data.autoconfigure.FastWebMyBatisPlusAutoConfiguration
+com.company.fastweb.core.data.autoconfigure.FastWebTransactionAutoConfiguration
+com.company.fastweb.core.data.autoconfigure.FastWebMigrationAutoConfiguration
