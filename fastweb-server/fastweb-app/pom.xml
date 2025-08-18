@@ -44,11 +44,15 @@
 
 
         <!-- Core Modules -->
-        <!-- 暂时注释掉，先让应用能够启动 -->
-        <!--
         <dependency>
             <groupId>com.company</groupId>
             <artifactId>fastweb-core-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.company</groupId>
+            <artifactId>fastweb-core-exception</artifactId>
             <version>${project.version}</version>
         </dependency>
         
@@ -60,10 +64,15 @@
         
         <dependency>
             <groupId>com.company</groupId>
-            <artifactId>fastweb-core-tenant</artifactId>
+            <artifactId>fastweb-core-security</artifactId>
             <version>${project.version}</version>
         </dependency>
-        -->
+        
+        <dependency>
+            <groupId>com.company</groupId>
+            <artifactId>fastweb-core-cache</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Business Modules -->
         <!-- 暂时注释掉，等user和auth模块创建后再启用 -->

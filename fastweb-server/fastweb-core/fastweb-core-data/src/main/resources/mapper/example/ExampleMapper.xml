@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 示例Mapper XML文件模板 -->
+<mapper namespace="com.company.fastweb.biz.example.mapper.ExampleMapper">
+
+    <!-- 基础结果映射 -->
+    <resultMap id="BaseResultMap" type="com.company.fastweb.biz.example.model.po.ExamplePO">
+        <id column="id" property="id" />
+        <result column="name" property="name" />
+        <result column="code" property="code" />
+        <result column="status" property="status" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="create_by" property="createBy" />
+        <result column="update_by" property="updateBy" />
+        <result column="is_deleted" property="isDeleted" />
+        <result column="tenant_id" property="tenantId" />
+        <result column="version" property="version" />
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, name, code, status, create_time, update_time, create_by, update_by, is_deleted, tenant_id, version
+    </sql>
+
+    <!-- 查询列表（排除逻辑删除数据） -->
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_example
+        WHERE is_deleted = 0
+        <if test="tenantId != null">
+            AND tenant_id = #{tenantId}
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据ID查询（排除逻辑删除数据） -->
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM t_example
+        WHERE id = #{id} AND is_deleted = 0
+        <if test="tenantId != null">
+            AND tenant_id = #{tenantId}
+        </if>
+    </select>
+
+    <!-- 逻辑删除 -->
+    <update id="deleteByIdLogic" parameterType="java.lang.Long">
+        UPDATE t_example
+        SET is_deleted = NULL, update_time = NOW(), update_by = #{updateBy}
+        WHERE id = #{id}
+        <if test="tenantId != null">
+            AND tenant_id = #{tenantId}
+        </if>
+    </update>
+
+</mapper>
