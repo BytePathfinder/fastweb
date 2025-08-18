@@ -1,68 +1,67 @@
-# Redis缓存配置
-spring:
-  redis:
-    # Redis服务器地址
-    host: localhost
-    # Redis服务器端口
-    port: 6379
-    # Redis服务器密码
-    password: 
-    # 使用的数据库索引
-    database: 0
-    # 连接超时时间（毫秒）
-    timeout: 3000
-    # 连接超时时间（毫秒）
-    connect-timeout: 3000
-    # 连接池配置
-    pool:
-      # 最大连接数
-      max-active: 8
-      # 最大空闲连接数
-      max-idle: 8
-      # 最小空闲连接数
-      min-idle: 0
-      # 连接空闲时间（毫秒）
-      idle-timeout: 60000
-    
-    # Redisson配置
-    redisson:
-      # 是否启用Redisson
-      enabled: true
-      # 单节点配置
-      single-server-config:
-        # 连接地址
-        address: "redis://localhost:6379"
-        # 数据库索引
-        database: 0
-        # 连接池大小
-        connection-pool-size: 64
-        # 最小空闲连接数
-        connection-minimum-idle-size: 10
-        # 连接空闲超时时间
-        idle-connection-timeout: 10000
-        # 连接超时时间
-        connect-timeout: 10000
-        # 响应超时时间
-        timeout: 3000
-
-# 缓存配置
 fastweb:
   cache:
-    # 默认缓存过期时间（分钟）
-    default-ttl: 30
-    # 用户缓存过期时间（分钟）
-    user-ttl: 30
-    # 字典缓存过期时间（小时）
-    dict-ttl: 1
-    # 配置缓存过期时间（小时）
-    config-ttl: 2
-    # 是否启用缓存
     enabled: true
-    # 是否启用缓存统计
-    statistics-enabled: true
+    # 缓存配置集合，可以定义多个缓存区域
+    configs:
+      # 默认缓存配置，当找不到特定名称的缓存时使用
+      default:
+        name: "default"
+        expireTime: 3600 # 过期时间（秒），这里是1小时
+        local:
+          enabled: true
+          initialCapacity: 100 # 本地缓存初始容量
+          maximumSize: 500   # 本地缓存最大容量
+        redis:
+          enabled: true
 
-# 日志配置
-logging:
-  level:
-    org.springframework.cache: DEBUG
-    org.springframework.data.redis: DEBUG
+      # 用户信息缓存
+      user:
+        name: "user"
+        expireTime: 1800 # 30分钟
+        local:
+          enabled: true
+          initialCapacity: 50
+          maximumSize: 200
+        redis:
+          enabled: true
+
+      # 数据字典缓存
+      dict:
+        name: "dict"
+        expireTime: 86400 # 24小时
+        local:
+          enabled: true
+          initialCapacity: 100
+          maximumSize: 1000
+        redis:
+          enabled: true
+
+# Spring Redis 基础配置 (供 RedisTemplate 和 RedisCacheManager 使用)
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  # Redisson 分布式锁配置 (由 redisson-spring-boot-starter 自动加载)
+  redisson:
+    # Redisson 配置文件路径，如果使用下面的配置，则无需指定 file
+    # file: classpath:redisson.yaml 
+    single-server-config:
+      address: "redis://${spring.data.redis.host}:${spring.data.redis.port}"
+      password: ${spring.data.redis.password}
+      database: ${spring.data.redis.database}
+      client-name: "fastweb-cache"
+      connection-pool-size: 64
+      connection-minimum-idle-size: 10
+      subscription-connection-pool-size: 50
+      connect-timeout: 10000
+      timeout: 3000

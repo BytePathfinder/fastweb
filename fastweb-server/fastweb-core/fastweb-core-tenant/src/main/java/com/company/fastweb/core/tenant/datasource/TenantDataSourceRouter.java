@@ -1,7 +1,6 @@
 package com.company.fastweb.core.tenant.datasource;
 
-import com.company.fastweb.core.data.datasource.DataSourceContextHolder;
-import com.company.fastweb.core.data.datasource.annotation.DS;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.company.fastweb.core.data.properties.FastWebDataProperties;
 import com.company.fastweb.core.tenant.context.TenantContextHolder;
 import org.springframework.stereotype.Component;
@@ -29,7 +28,7 @@ public class TenantDataSourceRouter {
         if (StringUtils.hasText(tenantId) && 
                 properties.getMybatisPlus().getTenant().getTenantMode() == FastWebDataProperties.TenantMode.DATABASE) {
             String dataSourceName = "tenant_" + tenantId;
-            DataSourceContextHolder.setDataSourceName(dataSourceName);
+            DynamicDataSourceContextHolder.push(dataSourceName);
         }
     }
     
@@ -38,27 +37,25 @@ public class TenantDataSourceRouter {
      *
      * @param tenantId 租户ID
      */
-    @DS("#tenantId")
     public void routeToTenantDataSource(String tenantId) {
         if (StringUtils.hasText(tenantId) && 
                 properties.getMybatisPlus().getTenant().getTenantMode() == FastWebDataProperties.TenantMode.DATABASE) {
             String dataSourceName = "tenant_" + tenantId;
-            DataSourceContextHolder.setDataSourceName(dataSourceName);
+            DynamicDataSourceContextHolder.push(dataSourceName);
         }
     }
     
     /**
      * 路由到主数据源
      */
-    @DS("master")
     public void routeToMasterDataSource() {
-        DataSourceContextHolder.setDataSourceName(properties.getPrimary());
+        DynamicDataSourceContextHolder.push(properties.getPrimary());
     }
     
     /**
      * 清除数据源路由
      */
     public void clearDataSourceRoute() {
-        DataSourceContextHolder.clear();
+        DynamicDataSourceContextHolder.clear();
     }
 }

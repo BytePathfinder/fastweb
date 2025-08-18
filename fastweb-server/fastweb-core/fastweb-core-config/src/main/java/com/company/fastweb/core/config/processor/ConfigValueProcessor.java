@@ -13,7 +13,7 @@ import java.lang.reflect.Field;
 
 /**
  * 配置值处理器
- * 自动注入配置值到标注了@ConfigValue的字段
+ * 自动注入@ConfigValue注解的字段
  *
  * @author FastWeb
  */
@@ -30,9 +30,9 @@ public class ConfigValueProcessor implements BeanPostProcessor {
         
         // 处理所有字段
         ReflectionUtils.doWithFields(clazz, field -> {
-            ConfigValue annotation = field.getAnnotation(ConfigValue.class);
-            if (annotation != null) {
-                processConfigValue(bean, field, annotation);
+            ConfigValue configValue = field.getAnnotation(ConfigValue.class);
+            if (configValue != null) {
+                processConfigValueField(bean, field, configValue);
             }
         });
         
@@ -40,59 +40,71 @@ public class ConfigValueProcessor implements BeanPostProcessor {
     }
 
     /**
-     * 处理配置值注入
+     * 处理配置值字段
      */
-    private void processConfigValue(Object bean, Field field, ConfigValue annotation) {
+    private void processConfigValueField(Object bean, Field field, ConfigValue configValue) {
         try {
-            String key = annotation.key();
-            String defaultValue = annotation.defaultValue();
-            
+            String key = configValue.key();
+            String defaultValue = configValue.defaultValue();
+            boolean required = configValue.required();
+            boolean autoRefresh = configValue.autoRefresh();
+
             // 获取配置值
-            Object value = getConfigValue(key, field.getType(), defaultValue);
+            Object value = getConfigValue(key, field.getType(), defaultValue, required);
             
-            // 设置字段值
-            ReflectionUtils.makeAccessible(field);
-            ReflectionUtils.setField(field, bean, value);
-            
-            // 如果需要自动刷新，添加监听器
-            if (annotation.autoRefresh()) {
-                configService.addConfigListener(key, (configKey, oldValue, newValue) -> {
-                    try {
-                        Object newVal = convertValue(newValue, field.getType(), defaultValue);
-                        ReflectionUtils.setField(field, bean, newVal);
-                        log.debug("配置值自动刷新: key={}, newValue={}", configKey, newValue);
-                    } catch (Exception e) {
-                        log.error("配置值自动刷新失败: key={}", configKey, e);
-                    }
-                });
-            }
-            
-            log.debug("配置值注入成功: key={}, value={}, field={}.{}", 
-                key, value, bean.getClass().getSimpleName(), field.getName());
+            if (value != null) {
+                // 设置字段值
+                ReflectionUtils.makeAccessible(field);
+                ReflectionUtils.setField(field, bean, value);
                 
+                log.debug("配置值注入成功: bean={}, field={}, key={}, value={}", 
+                    bean.getClass().getSimpleName(), field.getName(), key, value);
+                
+                // 如果需要自动刷新，添加监听器
+                if (autoRefresh) {
+                    configService.addConfigListener(key, (k, oldVal, newVal) -> {
+                        try {
+                            Object newValue = convertValue(newVal, field.getType(), defaultValue);
+                            ReflectionUtils.setField(field, bean, newValue);
+                            log.info("配置值自动刷新: bean={}, field={}, key={}, oldValue={}, newValue={}", 
+                                bean.getClass().getSimpleName(), field.getName(), k, oldVal, newVal);
+                        } catch (Exception e) {
+                            log.error("配置值自动刷新失败: bean={}, field={}, key={}", 
+                                bean.getClass().getSimpleName(), field.getName(), k, e);
+                        }
+                    });
+                }
+            }
         } catch (Exception e) {
-            log.error("配置值注入失败: key={}, field={}.{}", 
-                annotation.key(), bean.getClass().getSimpleName(), field.getName(), e);
+            log.error("配置值注入失败: bean={}, field={}, key={}", 
+                bean.getClass().getSimpleName(), field.getName(), configValue.key(), e);
         }
     }
 
     /**
      * 获取配置值
      */
-    private Object getConfigValue(String key, Class<?> type, String defaultValue) {
-        if (defaultValue.isEmpty()) {
-            return configService.getConfig(key, type);
-        } else {
-            Object defaultVal = convertValue(defaultValue, type, null);
-            return configService.getConfig(key, type, defaultVal);
+    private Object getConfigValue(String key, Class<?> type, String defaultValue, boolean required) {
+        // 先尝试从配置服务获取
+        Object value = configService.getConfig(key, type);
+        
+        if (value == null && !defaultValue.isEmpty()) {
+            // 使用默认值
+            value = convertValue(defaultValue, type, null);
         }
+        
+        if (value == null && required) {
+            throw new IllegalStateException("必需的配置项不存在: " + key);
+        }
+        
+        return value;
     }
 
     /**
      * 类型转换
      */
     @SuppressWarnings("unchecked")
-    private <T> T convertValue(String value, Class<T> type, String defaultValue) {
+    private Object convertValue(String value, Class<?> type, String defaultValue) {
         if (value == null) {
             value = defaultValue;
         }
@@ -100,27 +112,31 @@ public class ConfigValueProcessor implements BeanPostProcessor {
         if (value == null) {
             return null;
         }
-        
+
         if (type == String.class) {
-            return (T) value;
+            return value;
         }
-        
-        if (type == Integer.class || type == int.class) {
-            return (T) Integer.valueOf(value);
+
+        try {
+            if (type == Integer.class || type == int.class) {
+                return Integer.valueOf(value);
+            }
+            if (type == Long.class || type == long.class) {
+                return Long.valueOf(value);
+            }
+            if (type == Double.class || type == double.class) {
+                return Double.valueOf(value);
+            }
+            if (type == Boolean.class || type == boolean.class) {
+                return Boolean.valueOf(value);
+            }
+            
+            // 其他类型暂不支持
+            log.warn("不支持的配置值类型: {}", type.getName());
+            return value;
+        } catch (Exception e) {
+            log.error("配置值类型转换失败: value={}, type={}", value, type.getName(), e);
+            return null;
         }
-        
-        if (type == Long.class || type == long.class) {
-            return (T) Long.valueOf(value);
-        }
-        
-        if (type == Double.class || type == double.class) {
-            return (T) Double.valueOf(value);
-        }
-        
-        if (type == Boolean.class || type == boolean.class) {
-            return (T) Boolean.valueOf(value);
-        }
-        
-        throw new IllegalArgumentException("不支持的配置值类型: " + type.getSimpleName());
     }
 }

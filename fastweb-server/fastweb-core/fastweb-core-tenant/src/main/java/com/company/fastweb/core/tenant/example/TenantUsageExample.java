@@ -10,9 +10,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -26,7 +29,7 @@ public class TenantUsageExample {
      */
     @Data
     @EqualsAndHashCode(callSuper = true)
-    public static class User extends BaseEntity {
+    public static class User extends BaseEntity implements Serializable {
         
         private Long userId;
         
@@ -76,8 +79,12 @@ public class TenantUsageExample {
          * 自动设置租户ID
          */
         @PostMapping
-        public User createUser(@RequestBody User user) {
-            return userService.save(user);
+        public ResponseEntity<User> createUser(@RequestBody User user) {
+            boolean success = userService.save(user);
+            if (success) {
+                return ResponseEntity.status(HttpStatus.CREATED).body(user);
+            }
+            return ResponseEntity.badRequest().build();
         }
         
         /**
@@ -85,9 +92,13 @@ public class TenantUsageExample {
          * 只能更新当前租户的用户
          */
         @PutMapping("/{id}")
-        public User updateUser(@PathVariable Long id, @RequestBody User user) {
-            user.setUserId(id);
-            return userService.updateById(user);
+        public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
+            user.setId(id);
+            boolean success = userService.updateById(user);
+            if (success) {
+                return ResponseEntity.ok(user);
+            }
+            return ResponseEntity.notFound().build();
         }
         
         /**
@@ -133,7 +144,7 @@ public class TenantUsageExample {
          */
         @Override
         @Cacheable(value = "userCache", keyGenerator = "tenantAwareCacheKeyGenerator")
-        public User getById(Long id) {
+        public User getById(Serializable id) {
             return baseMapper.selectById(id);
         }
         

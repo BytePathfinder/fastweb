@@ -1,116 +1,119 @@
 package com.company.fastweb.core.data.config;
 
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
-import com.baomidou.mybatisplus.extension.incrementer.IdentifierGenerator;
+import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
+import com.baomidou.mybatisplus.extension.plugins.inner.BlockAttackInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.IllegalSQLInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
-import com.company.fastweb.core.data.handler.MyMetaObjectHandler;
-import com.company.fastweb.core.data.interceptor.TenantLineHandlerImpl;
+import com.company.fastweb.core.data.handler.JsonMapTypeHandler;
+import com.company.fastweb.core.data.properties.FastWebDataProperties;
+
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * MyBatis-Plus配置类
+ * MyBatis-Plus 企业级配置类
+ * 提供完整的 MyBatis-Plus 插件配置和企业级功能
  *
  * @author FastWeb
  */
+@Slf4j
 @Configuration
-@EnableTransactionManagement
+@RequiredArgsConstructor
 @MapperScan("com.company.fastweb.**.mapper")
+@EnableTransactionManagement
+@EnableConfigurationProperties(FastWebDataProperties.class)
+@ConditionalOnClass(SqlSessionFactory.class)
 public class MyBatisPlusConfig {
 
+    private final FastWebDataProperties dataProperties;
+
+    @PostConstruct
+    public void init() {
+        log.info("MyBatis-Plus 配置初始化完成");
+        log.info("分页插件配置 - 默认页大小: {}, 最大页大小: {}", 
+                dataProperties.getMybatisPlus().getPage().getDefaultSize(),
+                dataProperties.getMybatisPlus().getPage().getMaxSize());
+        if (dataProperties.getMybatisPlus().getTenant().isEnabled()) {
+            log.info("多租户插件已启用 - 租户字段: {}", 
+                    dataProperties.getMybatisPlus().getTenant().getTenantIdColumn());
+        }
+    }
+
     /**
-     * MyBatis-Plus插件配置
+     * MyBatis-Plus 拦截器配置
+     * 包含分页、多租户、乐观锁、防全表更新删除、SQL性能规范检查等插件
      */
     @Bean
-    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+    @ConditionalOnMissingBean
+    public MybatisPlusInterceptor mybatisPlusInterceptor(
+            @Autowired(required = false) TenantLineHandler tenantLineHandler) {
+        
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
         
-        // 分页插件
-        PaginationInnerInterceptor paginationInnerInterceptor = new PaginationInnerInterceptor();
-        paginationInnerInterceptor.setMaxLimit(1000L); // 单页最大限制
-        paginationInnerInterceptor.setOverflow(false); // 超出总页数是否返回最后一页
-        interceptor.addInnerInterceptor(paginationInnerInterceptor);
+        // 1. 多租户插件（如果启用且存在处理器）
+        if (dataProperties.getMybatisPlus().getTenant().isEnabled() && tenantLineHandler != null) {
+            TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor(tenantLineHandler);
+            interceptor.addInnerInterceptor(tenantInterceptor);
+            log.info("多租户插件已加载");
+        }
         
-        // 乐观锁插件
+        // 2. 分页插件
+        PaginationInnerInterceptor paginationInterceptor = new PaginationInnerInterceptor();
+        paginationInterceptor.setDbType(DbType.MYSQL);
+        paginationInterceptor.setMaxLimit(dataProperties.getMybatisPlus().getPage().getMaxSize());
+        paginationInterceptor.setOverflow(false);
+        interceptor.addInnerInterceptor(paginationInterceptor);
+        log.info("分页插件已加载");
+        
+        // 3. 乐观锁插件
         interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
+        log.info("乐观锁插件已加载");
         
-        // 多租户插件
-        interceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new TenantLineHandlerImpl()));
+        // 4. 防全表更新与删除插件
+        interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
+        log.info("防全表更新删除插件已加载");
+        
+        // 5. SQL性能规范插件
+        interceptor.addInnerInterceptor(new IllegalSQLInnerInterceptor());
+        log.info("SQL性能规范插件已加载");
         
         return interceptor;
     }
 
     /**
-     * 元对象字段填充处理器
+     * JSON Map 类型处理器
+     * 用于处理JSON字段与Map对象的转换
      */
     @Bean
     @ConditionalOnMissingBean
-    public MetaObjectHandler metaObjectHandler() {
-        return new MyMetaObjectHandler();
+    @ConditionalOnProperty(prefix = "fastweb.data", name = "enable-json-type-handler", havingValue = "true", matchIfMissing = true)
+    public JsonMapTypeHandler jsonMapTypeHandler() {
+        log.info("JSON Map 类型处理器已注册");
+        return new JsonMapTypeHandler();
     }
 
     /**
-     * 主键生成器
-     * <p>使用雪花算法生成分布式唯一ID，支持高并发场景</p>
+     * 注册自定义类型处理器到 SqlSessionFactory
      */
-    @Bean
-    public IdentifierGenerator identifierGenerator() {
-        return new IdentifierGenerator() {
-            private final long workerId = 1L; // 工作节点ID，生产环境建议配置化
-            private final long datacenterId = 1L; // 数据中心ID
-            private long sequence = 0L;
-            private long lastTimestamp = -1L;
-            
-            private static final long WORKER_ID_BITS = 5L;
-            private static final long DATACENTER_ID_BITS = 5L;
-            private static final long MAX_WORKER_ID = ~(-1L << WORKER_ID_BITS);
-            private static final long MAX_DATACENTER_ID = ~(-1L << DATACENTER_ID_BITS);
-            private static final long SEQUENCE_BITS = 12L;
-            
-            private static final long WORKER_ID_SHIFT = SEQUENCE_BITS;
-            private static final long DATACENTER_ID_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS;
-            private static final long TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS + DATACENTER_ID_BITS;
-            private static final long SEQUENCE_MASK = ~(-1L << SEQUENCE_BITS);
-            
-            @Override
-            public synchronized Number nextId(Object entity) {
-                long timestamp = System.currentTimeMillis();
-                
-                if (timestamp < lastTimestamp) {
-                    throw new RuntimeException("时钟向后移动，拒绝生成ID " + (lastTimestamp - timestamp));
-                }
-                
-                if (lastTimestamp == timestamp) {
-                    sequence = (sequence + 1) & SEQUENCE_MASK;
-                    if (sequence == 0) {
-                        timestamp = tilNextMillis(lastTimestamp);
-                    }
-                } else {
-                    sequence = 0L;
-                }
-                
-                lastTimestamp = timestamp;
-                
-                return ((timestamp - 1288834974657L) << TIMESTAMP_LEFT_SHIFT)
-                        | (datacenterId << DATACENTER_ID_SHIFT)
-                        | (workerId << WORKER_ID_SHIFT)
-                        | sequence;
-            }
-            
-            private long tilNextMillis(long lastTimestamp) {
-                long timestamp = System.currentTimeMillis();
-                while (timestamp <= lastTimestamp) {
-                    timestamp = System.currentTimeMillis();
-                }
-                return timestamp;
-            }
-        };
+    @PostConstruct
+    public void registerTypeHandlers() {
+        // 类型处理器会通过 @MappedTypes 和 @MappedJdbcTypes 自动注册
+        log.debug("自定义类型处理器注册完成");
     }
 }

@@ -21,7 +21,7 @@ public class EnhancedTenantLineHandler implements TenantLineHandler {
 
     public EnhancedTenantLineHandler(FastWebDataProperties properties) {
         this.properties = properties;
-        this.ignoreTables = Arrays.asList(properties.getMybatisPlus().getTenant().getIgnoreTables());
+        this.ignoreTables = properties.getMybatisPlus().getTenant().getIgnoreTables();
     }
 
     @Override

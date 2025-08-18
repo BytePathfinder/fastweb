@@ -5,6 +5,7 @@ import com.company.fastweb.core.common.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -110,7 +111,10 @@ public class RedisCacheServiceImpl implements CacheService {
 
     @Override
     public Map<String, Object> hGetAll(String key) {
-        return redisTemplate.opsForHash().entries(key);
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
+        Map<String, Object> result = new HashMap<>();
+        entries.forEach((k, v) -> result.put(k.toString(), v));
+        return result;
     }
 
     @Override
@@ -126,7 +130,10 @@ public class RedisCacheServiceImpl implements CacheService {
     @Override
     @SuppressWarnings("unchecked")
     public Set<String> hKeys(String key) {
-        return (Set<String>) redisTemplate.opsForHash().keys(key);
+        Set<Object> keys = redisTemplate.opsForHash().keys(key);
+        return keys.stream()
+                .map(Object::toString)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     @Override
@@ -238,7 +245,7 @@ public class RedisCacheServiceImpl implements CacheService {
     }
 
     @Override
-    public Set<Object> zRangeWithScores(String key, long start, long end) {
+    public Set<ZSetOperations.TypedTuple<Object>> zRangeWithScores(String key, long start, long end) {
         return redisTemplate.opsForZSet().rangeWithScores(key, start, end);
     }
 

@@ -4,7 +4,7 @@ import java.lang.annotation.*;
 
 /**
  * 配置值注解
- * 用于自动注入配置值到字段
+ * 用于自动注入配置值到字段或方法参数
  *
  * @author FastWeb
  */
@@ -22,6 +22,11 @@ public @interface ConfigValue {
      * 默认值
      */
     String defaultValue() default "";
+
+    /**
+     * 是否必需
+     */
+    boolean required() default false;
 
     /**
      * 是否自动刷新

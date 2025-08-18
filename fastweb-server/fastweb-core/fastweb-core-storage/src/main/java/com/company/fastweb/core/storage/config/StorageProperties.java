@@ -13,68 +13,78 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class StorageProperties {
 
     /**
-     * 存储类型：minio, local, s3
+     * 本地存储配置
      */
-    private String type = "minio";
+    private LocalProperties local = new LocalProperties();
 
     /**
-     * 服务端点
+     * MinIO配置
      */
-    private String endpoint = "http://localhost:9000";
-
-    /**
-     * 访问密钥
-     */
-    private String accessKey = "minioadmin";
-
-    /**
-     * 秘密密钥
-     */
-    private String secretKey = "minioadmin";
+    private MinioProperties minio = new MinioProperties();
 
     /**
      * 默认存储桶
      */
     private String defaultBucket = "fastweb";
 
-    /**
-     * 是否公开读取
-     */
-    private boolean publicRead = true;
-
-    /**
-     * 连接超时时间（毫秒）
-     */
-    private long connectTimeout = 10000;
-
-    /**
-     * 写入超时时间（毫秒）
-     */
-    private long writeTimeout = 60000;
-
-    /**
-     * 读取超时时间（毫秒）
-     */
-    private long readTimeout = 10000;
-
-    /**
-     * 本地存储配置
-     */
-    private Local local = new Local();
-
-    /**
-     * 本地存储配置
-     */
     @Data
-    public static class Local {
+    public static class MinioProperties {
+        /**
+         * MinIO服务端点
+         */
+        private String endpoint;
+
+        /**
+         * 访问密钥
+         */
+        private String accessKey;
+
+        /**
+         * 秘密密钥
+         */
+        private String secretKey;
+
+        /**
+         * 区域
+         */
+        private String region;
+
+        /**
+         * 默认存储桶
+         */
+        private String defaultBucket = "fastweb";
+
+        /**
+         * 是否启用HTTPS
+         */
+        private boolean secure = false;
+
+        /**
+         * 连接超时时间（毫秒）
+         */
+        private int connectTimeout = 10000;
+
+        /**
+         * 写超时时间（毫秒）
+         */
+        private int writeTimeout = 60000;
+
+        /**
+         * 读超时时间（毫秒）
+         */
+        private int readTimeout = 10000;
+    }
+
+    @Data
+    public static class LocalProperties {
         /**
          * 本地存储路径
          */
         private String path = "./storage";
 
         /**
-         * 访问路径前缀
+         * URL前缀
          */
-        private String urlPrefix = "/files";
+        private String urlPrefix = "/api/storage";
     }
 }

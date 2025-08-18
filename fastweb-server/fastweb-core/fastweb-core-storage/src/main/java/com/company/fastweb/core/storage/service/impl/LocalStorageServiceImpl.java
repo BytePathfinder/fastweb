@@ -29,7 +29,7 @@ public class LocalStorageServiceImpl implements StorageService {
     private final StorageProperties storageProperties;
 
     @Override
-    public String upload(String bucketName, String objectName, InputStream inputStream, String contentType) {
+    public String uploadFile(String bucketName, String objectName, InputStream inputStream, String contentType) {
         try {
             Path bucketPath = getBucketPath(bucketName);
             Path filePath = bucketPath.resolve(objectName);
@@ -50,12 +50,12 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public String upload(String objectName, InputStream inputStream, String contentType) {
-        return upload(storageProperties.getDefaultBucket(), objectName, inputStream, contentType);
+    public String uploadFile(String objectName, InputStream inputStream, String contentType) {
+        return uploadFile(storageProperties.getDefaultBucket(), objectName, inputStream, contentType);
     }
 
     @Override
-    public InputStream download(String bucketName, String objectName) {
+    public InputStream downloadFile(String bucketName, String objectName) {
         try {
             Path filePath = getBucketPath(bucketName).resolve(objectName);
             if (!Files.exists(filePath)) {
@@ -69,12 +69,12 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public InputStream download(String objectName) {
-        return download(storageProperties.getDefaultBucket(), objectName);
+    public InputStream downloadFile(String objectName) {
+        return downloadFile(storageProperties.getDefaultBucket(), objectName);
     }
 
     @Override
-    public boolean delete(String bucketName, String objectName) {
+    public boolean deleteFile(String bucketName, String objectName) {
         try {
             Path filePath = getBucketPath(bucketName).resolve(objectName);
             boolean deleted = Files.deleteIfExists(filePath);
@@ -89,15 +89,15 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public boolean delete(String objectName) {
-        return delete(storageProperties.getDefaultBucket(), objectName);
+    public boolean deleteFile(String objectName) {
+        return deleteFile(storageProperties.getDefaultBucket(), objectName);
     }
 
     @Override
-    public List<String> deleteMultiple(String bucketName, List<String> objectNames) {
+    public List<String> deleteFiles(String bucketName, List<String> objectNames) {
         List<String> errors = new ArrayList<>();
         for (String objectName : objectNames) {
-            if (!delete(bucketName, objectName)) {
+            if (!deleteFile(bucketName, objectName)) {
                 errors.add("删除失败: " + objectName);
             }
         }
@@ -105,35 +105,31 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public boolean exists(String bucketName, String objectName) {
+    public boolean fileExists(String bucketName, String objectName) {
         Path filePath = getBucketPath(bucketName).resolve(objectName);
         return Files.exists(filePath);
     }
 
     @Override
-    public boolean exists(String objectName) {
-        return exists(storageProperties.getDefaultBucket(), objectName);
+    public boolean fileExists(String objectName) {
+        return fileExists(storageProperties.getDefaultBucket(), objectName);
     }
 
     @Override
-    public StorageObject getObjectInfo(String bucketName, String objectName) {
+    public FileInfo getFileInfo(String bucketName, String objectName) {
         try {
             Path filePath = getBucketPath(bucketName).resolve(objectName);
             if (!Files.exists(filePath)) {
                 throw BizException.of("FILE_NOT_FOUND", "文件不存在: " + objectName);
             }
 
-            return StorageObject.builder()
-                .objectName(objectName)
-                .bucketName(bucketName)
-                .size(Files.size(filePath))
-                .contentType(Files.probeContentType(filePath))
-                .lastModified(LocalDateTime.ofInstant(
-                    Files.getLastModifiedTime(filePath).toInstant(), 
-                    ZoneId.systemDefault()))
-                .url(getObjectUrl(bucketName, objectName))
-                .isDirectory(Files.isDirectory(filePath))
-                .build();
+            String contentType = Files.probeContentType(filePath);
+            long size = Files.size(filePath);
+            String lastModified = Files.getLastModifiedTime(filePath).toString();
+            // ETag is not readily available for local files, so we'll use an empty string.
+            String etag = "";
+
+            return new FileInfo(objectName, etag, size, lastModified, contentType);
 
         } catch (IOException e) {
             log.error("获取文件信息失败: bucket={}, object={}", bucketName, objectName, e);
@@ -142,17 +138,17 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public StorageObject getObjectInfo(String objectName) {
-        return getObjectInfo(storageProperties.getDefaultBucket(), objectName);
+    public FileInfo getFileInfo(String objectName) {
+        return getFileInfo(storageProperties.getDefaultBucket(), objectName);
     }
 
     @Override
-    public List<StorageObject> listObjects(String bucketName, String prefix, int maxKeys) {
-        List<StorageObject> objects = new ArrayList<>();
+    public List<FileInfo> listFiles(String bucketName, String prefix, int maxKeys) {
+        List<FileInfo> files = new ArrayList<>();
         try {
             Path bucketPath = getBucketPath(bucketName);
             if (!Files.exists(bucketPath)) {
-                return objects;
+                return files;
             }
 
             try (Stream<Path> paths = Files.walk(bucketPath)) {
@@ -165,17 +161,11 @@ public class LocalStorageServiceImpl implements StorageService {
                     .forEach(path -> {
                         try {
                             String objectName = bucketPath.relativize(path).toString().replace("\\", "/");
-                            objects.add(StorageObject.builder()
-                                .objectName(objectName)
-                                .bucketName(bucketName)
-                                .size(Files.size(path))
-                                .contentType(Files.probeContentType(path))
-                                .lastModified(LocalDateTime.ofInstant(
-                                    Files.getLastModifiedTime(path).toInstant(), 
-                                    ZoneId.systemDefault()))
-                                .url(getObjectUrl(bucketName, objectName))
-                                .isDirectory(false)
-                                .build());
+                            String contentType = Files.probeContentType(path);
+                            long size = Files.size(path);
+                            String lastModified = Files.getLastModifiedTime(path).toString();
+                            
+                            files.add(new FileInfo(objectName, "", size, lastModified, contentType));
                         } catch (IOException e) {
                             log.warn("获取文件信息失败: {}", path, e);
                         }
@@ -185,24 +175,31 @@ public class LocalStorageServiceImpl implements StorageService {
             log.error("列出文件失败: bucket={}, prefix={}", bucketName, prefix, e);
             throw BizException.of("LIST_OBJECTS_ERROR", "列出文件失败: " + e.getMessage());
         }
-        return objects;
+        return files;
     }
 
     @Override
-    public List<StorageObject> listObjects(String prefix, int maxKeys) {
-        return listObjects(storageProperties.getDefaultBucket(), prefix, maxKeys);
+    public List<FileInfo> listFiles(String prefix, int maxKeys) {
+        return listFiles(storageProperties.getDefaultBucket(), prefix, maxKeys);
     }
 
     @Override
-    public String generatePresignedUrl(String bucketName, String objectName, int expiry) {
-        // 本地存储不支持预签名URL，直接返回访问URL
+    public String getPresignedUploadUrl(String bucketName, String objectName, int expiry) {
+        // 本地存储不支持预签名，直接返回访问URL
         return getObjectUrl(bucketName, objectName);
     }
 
     @Override
-    public String generatePresignedUrl(String objectName, int expiry) {
-        return generatePresignedUrl(storageProperties.getDefaultBucket(), objectName, expiry);
+    public String getPresignedDownloadUrl(String bucketName, String objectName, int expiry) {
+        // 本地存储不支持预签名，直接返回访问URL
+        return getObjectUrl(bucketName, objectName);
     }
+
+    // 删除以下无用方法
+    // @Override
+    // public String generatePresignedUrl(String objectName, int expiry) {
+    //     return generatePresignedUrl(storageProperties.getDefaultBucket(), objectName, expiry);
+    // }
 
     @Override
     public boolean createBucket(String bucketName) {

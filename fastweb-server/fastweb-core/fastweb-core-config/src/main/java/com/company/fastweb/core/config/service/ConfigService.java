@@ -89,7 +89,7 @@ public interface ConfigService {
      * @param key 配置键
      * @return 是否存在
      */
-    boolean exists(String key);
+    boolean hasConfig(String key);
 
     /**
      * 获取配置列表
@@ -97,12 +97,12 @@ public interface ConfigService {
      * @param prefix 前缀
      * @return 配置列表
      */
-    List<ConfigItem> getConfigList(String prefix);
+    Map<String, String> getConfigs(String prefix);
 
     /**
      * 获取所有配置
      *
-     * @return 配置映射
+     * @return 所有配置
      */
     Map<String, String> getAllConfigs();
 
@@ -144,6 +144,6 @@ public interface ConfigService {
          * @param oldValue 旧值
          * @param newValue 新值
          */
-        void onChange(String key, String oldValue, String newValue);
+        void onConfigChange(String key, String oldValue, String newValue);
     }
 }

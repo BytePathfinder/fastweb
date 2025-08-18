@@ -1,15 +1,15 @@
 package com.company.fastweb.core.data.util;
 
+import java.util.Collection;
+
+import org.springframework.util.CollectionUtils;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.springframework.util.CollectionUtils;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * MyBatis-Plus工具类

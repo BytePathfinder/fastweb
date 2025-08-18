@@ -2,14 +2,16 @@ package com.company.fastweb.core.config.service.impl;
 
 import com.company.fastweb.core.cache.service.CacheService;
 import com.company.fastweb.core.common.util.JsonUtils;
-import com.company.fastweb.core.config.service.ConfigItem;
 import com.company.fastweb.core.config.service.ConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.*;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -24,47 +26,35 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class CacheConfigServiceImpl implements ConfigService {
 
     private final CacheService cacheService;
-    
+
     private static final String CONFIG_PREFIX = "config:";
-    private static final String CONFIG_LIST_KEY = "config:list";
-    
+    private static final String CONFIG_DESC_PREFIX = "config:desc:";
+    private static final Duration CONFIG_EXPIRE = Duration.ofHours(24);
+
     // 配置变更监听器
     private final Map<String, List<ConfigChangeListener>> listeners = new ConcurrentHashMap<>();
 
     @Override
     public String getConfig(String key) {
-        return getConfig(key, null);
+        return cacheService.get(CONFIG_PREFIX + key, String.class);
     }
 
     @Override
     public String getConfig(String key, String defaultValue) {
-        try {
-            ConfigItem item = cacheService.get(CONFIG_PREFIX + key, ConfigItem.class);
-            return item != null ? item.getValue() : defaultValue;
-        } catch (Exception e) {
-            log.error("获取配置失败: key={}", key, e);
-            return defaultValue;
-        }
+        String value = getConfig(key);
+        return value != null ? value : defaultValue;
     }
 
     @Override
     public <T> T getConfig(String key, Class<T> type) {
-        return getConfig(key, type, null);
+        String value = getConfig(key);
+        return convertValue(value, type);
     }
 
     @Override
     public <T> T getConfig(String key, Class<T> type, T defaultValue) {
-        String value = getConfig(key);
-        if (value == null) {
-            return defaultValue;
-        }
-        
-        try {
-            return convertValue(value, type);
-        } catch (Exception e) {
-            log.error("配置值类型转换失败: key={}, value={}, type={}", key, value, type.getSimpleName(), e);
-            return defaultValue;
-        }
+        T value = getConfig(key, type);
+        return value != null ? value : defaultValue;
     }
 
     @Override
@@ -75,34 +65,23 @@ public class CacheConfigServiceImpl implements ConfigService {
     @Override
     public boolean setConfig(String key, String value, String description) {
         try {
-            // 获取旧值
             String oldValue = getConfig(key);
             
-            // 创建配置项
-            ConfigItem item = ConfigItem.builder()
-                .key(key)
-                .value(value)
-                .description(description)
-                .createTime(LocalDateTime.now())
-                .updateTime(LocalDateTime.now())
-                .creator("system")
-                .updater("system")
-                .build();
+            // 设置配置值
+            cacheService.set(CONFIG_PREFIX + key, value, CONFIG_EXPIRE);
             
-            // 保存到缓存
-            cacheService.set(CONFIG_PREFIX + key, item);
-            
-            // 更新配置列表
-            updateConfigList(key);
+            // 设置描述（如果有）
+            if (description != null && !description.trim().isEmpty()) {
+                cacheService.set(CONFIG_DESC_PREFIX + key, description, CONFIG_EXPIRE);
+            }
             
             // 触发变更监听器
             notifyConfigChange(key, oldValue, value);
             
             log.info("配置设置成功: key={}, value={}", key, value);
             return true;
-            
         } catch (Exception e) {
-            log.error("设置配置失败: key={}, value={}", key, value, e);
+            log.error("配置设置失败: key={}, value={}", key, value, e);
             return false;
         }
     }
@@ -111,21 +90,18 @@ public class CacheConfigServiceImpl implements ConfigService {
     public boolean deleteConfig(String key) {
         try {
             String oldValue = getConfig(key);
-            boolean deleted = cacheService.delete(CONFIG_PREFIX + key);
             
-            if (deleted) {
-                // 从配置列表中移除
-                removeFromConfigList(key);
-                
-                // 触发变更监听器
-                notifyConfigChange(key, oldValue, null);
-                
-                log.info("配置删除成功: key={}", key);
-            }
+            // 删除配置值和描述
+            cacheService.delete(CONFIG_PREFIX + key);
+            cacheService.delete(CONFIG_DESC_PREFIX + key);
             
-            return deleted;
+            // 触发变更监听器
+            notifyConfigChange(key, oldValue, null);
+            
+            log.info("配置删除成功: key={}", key);
+            return true;
         } catch (Exception e) {
-            log.error("删除配置失败: key={}", key, e);
+            log.error("配置删除失败: key={}", key, e);
             return false;
         }
     }
@@ -142,64 +118,53 @@ public class CacheConfigServiceImpl implements ConfigService {
     }
 
     @Override
-    public boolean exists(String key) {
+    public boolean hasConfig(String key) {
         return cacheService.hasKey(CONFIG_PREFIX + key);
     }
 
     @Override
-    public List<ConfigItem> getConfigList(String prefix) {
-        List<ConfigItem> result = new ArrayList<>();
+    public Map<String, String> getConfigs(String prefix) {
+        Map<String, String> configs = new HashMap<>();
         try {
-            Set<String> keys = cacheService.sMembers(CONFIG_LIST_KEY, String.class);
+            Set<String> keys = cacheService.keys(CONFIG_PREFIX + prefix + "*");
             for (String key : keys) {
-                if (prefix == null || key.startsWith(prefix)) {
-                    ConfigItem item = cacheService.get(CONFIG_PREFIX + key, ConfigItem.class);
-                    if (item != null) {
-                        result.add(item);
-                    }
+                String configKey = key.substring(CONFIG_PREFIX.length());
+                String value = cacheService.get(key, String.class);
+                if (value != null) {
+                    configs.put(configKey, value);
                 }
             }
         } catch (Exception e) {
             log.error("获取配置列表失败: prefix={}", prefix, e);
         }
-        return result;
+        return configs;
     }
 
     @Override
     public Map<String, String> getAllConfigs() {
-        Map<String, String> result = new HashMap<>();
-        try {
-            Set<String> keys = cacheService.sMembers(CONFIG_LIST_KEY, String.class);
-            for (String key : keys) {
-                String value = getConfig(key);
-                if (value != null) {
-                    result.put(key, value);
-                }
-            }
-        } catch (Exception e) {
-            log.error("获取所有配置失败", e);
-        }
-        return result;
+        return getConfigs("");
     }
 
     @Override
     public void refreshCache() {
-        // 基于缓存的实现，无需刷新
+        // 基于缓存的实现，不需要特殊的刷新操作
         log.info("配置缓存刷新完成");
     }
 
     @Override
     public void clearCache() {
         try {
-            Set<String> keys = cacheService.sMembers(CONFIG_LIST_KEY, String.class);
-            List<String> cacheKeys = new ArrayList<>();
-            for (String key : keys) {
-                cacheKeys.add(CONFIG_PREFIX + key);
-            }
-            cacheService.delete(cacheKeys);
-            cacheService.delete(CONFIG_LIST_KEY);
+            Set<String> configKeys = cacheService.keys(CONFIG_PREFIX + "*");
+            Set<String> descKeys = cacheService.keys(CONFIG_DESC_PREFIX + "*");
             
-            log.info("配置缓存清空完成");
+            if (!configKeys.isEmpty()) {
+                cacheService.delete(configKeys);
+            }
+            if (!descKeys.isEmpty()) {
+                cacheService.delete(descKeys);
+            }
+            
+            log.info("配置缓存清空完成: configs={}, descriptions={}", configKeys.size(), descKeys.size());
         } catch (Exception e) {
             log.error("清空配置缓存失败", e);
         }
@@ -224,28 +189,14 @@ public class CacheConfigServiceImpl implements ConfigService {
     }
 
     /**
-     * 更新配置列表
-     */
-    private void updateConfigList(String key) {
-        cacheService.sAdd(CONFIG_LIST_KEY, key);
-    }
-
-    /**
-     * 从配置列表中移除
-     */
-    private void removeFromConfigList(String key) {
-        cacheService.sRemove(CONFIG_LIST_KEY, key);
-    }
-
-    /**
      * 通知配置变更
      */
     private void notifyConfigChange(String key, String oldValue, String newValue) {
         List<ConfigChangeListener> keyListeners = listeners.get(key);
-        if (keyListeners != null) {
+        if (keyListeners != null && !keyListeners.isEmpty()) {
             for (ConfigChangeListener listener : keyListeners) {
                 try {
-                    listener.onChange(key, oldValue, newValue);
+                    listener.onConfigChange(key, oldValue, newValue);
                 } catch (Exception e) {
                     log.error("配置变更监听器执行失败: key={}", key, e);
                 }
@@ -261,28 +212,30 @@ public class CacheConfigServiceImpl implements ConfigService {
         if (value == null) {
             return null;
         }
-        
+
         if (type == String.class) {
             return (T) value;
         }
-        
-        if (type == Integer.class || type == int.class) {
-            return (T) Integer.valueOf(value);
+
+        try {
+            if (type == Integer.class || type == int.class) {
+                return (T) Integer.valueOf(value);
+            }
+            if (type == Long.class || type == long.class) {
+                return (T) Long.valueOf(value);
+            }
+            if (type == Double.class || type == double.class) {
+                return (T) Double.valueOf(value);
+            }
+            if (type == Boolean.class || type == boolean.class) {
+                return (T) Boolean.valueOf(value);
+            }
+
+            // 复杂类型使用JSON反序列化
+            return JsonUtils.parseObject(value, type);
+        } catch (Exception e) {
+            log.error("配置值类型转换失败: value={}, type={}", value, type.getName(), e);
+            return null;
         }
-        
-        if (type == Long.class || type == long.class) {
-            return (T) Long.valueOf(value);
-        }
-        
-        if (type == Double.class || type == double.class) {
-            return (T) Double.valueOf(value);
-        }
-        
-        if (type == Boolean.class || type == boolean.class) {
-            return (T) Boolean.valueOf(value);
-        }
-        
-        // 尝试JSON反序列化
-        return JsonUtils.parseObject(value, type);
     }
 }

@@ -19,7 +19,7 @@ public interface StorageService {
      * @param contentType 文件类型
      * @return 文件访问URL
      */
-    String upload(String bucketName, String objectName, InputStream inputStream, String contentType);
+    String uploadFile(String bucketName, String objectName, InputStream inputStream, String contentType);
 
     /**
      * 上传文件（默认存储桶）
@@ -29,7 +29,7 @@ public interface StorageService {
      * @param contentType 文件类型
      * @return 文件访问URL
      */
-    String upload(String objectName, InputStream inputStream, String contentType);
+    String uploadFile(String objectName, InputStream inputStream, String contentType);
 
     /**
      * 下载文件
@@ -38,7 +38,7 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 文件流
      */
-    InputStream download(String bucketName, String objectName);
+    InputStream downloadFile(String bucketName, String objectName);
 
     /**
      * 下载文件（默认存储桶）
@@ -46,7 +46,7 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 文件流
      */
-    InputStream download(String objectName);
+    InputStream downloadFile(String objectName);
 
     /**
      * 删除文件
@@ -55,7 +55,7 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 是否删除成功
      */
-    boolean delete(String bucketName, String objectName);
+    boolean deleteFile(String bucketName, String objectName);
 
     /**
      * 删除文件（默认存储桶）
@@ -63,16 +63,16 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 是否删除成功
      */
-    boolean delete(String objectName);
+    boolean deleteFile(String objectName);
 
     /**
      * 批量删除文件
      *
      * @param bucketName 存储桶名称
      * @param objectNames 对象名称列表
-     * @return 删除结果列表
+     * @return 删除结果
      */
-    List<String> deleteMultiple(String bucketName, List<String> objectNames);
+    List<String> deleteFiles(String bucketName, List<String> objectNames);
 
     /**
      * 检查文件是否存在
@@ -81,7 +81,7 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 是否存在
      */
-    boolean exists(String bucketName, String objectName);
+    boolean fileExists(String bucketName, String objectName);
 
     /**
      * 检查文件是否存在（默认存储桶）
@@ -89,7 +89,7 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 是否存在
      */
-    boolean exists(String objectName);
+    boolean fileExists(String objectName);
 
     /**
      * 获取文件信息
@@ -98,7 +98,7 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 文件信息
      */
-    StorageObject getObjectInfo(String bucketName, String objectName);
+    FileInfo getFileInfo(String bucketName, String objectName);
 
     /**
      * 获取文件信息（默认存储桶）
@@ -106,7 +106,7 @@ public interface StorageService {
      * @param objectName 对象名称
      * @return 文件信息
      */
-    StorageObject getObjectInfo(String objectName);
+    FileInfo getFileInfo(String objectName);
 
     /**
      * 列出文件
@@ -116,7 +116,7 @@ public interface StorageService {
      * @param maxKeys 最大数量
      * @return 文件列表
      */
-    List<StorageObject> listObjects(String bucketName, String prefix, int maxKeys);
+    List<FileInfo> listFiles(String bucketName, String prefix, int maxKeys);
 
     /**
      * 列出文件（默认存储桶）
@@ -125,26 +125,27 @@ public interface StorageService {
      * @param maxKeys 最大数量
      * @return 文件列表
      */
-    List<StorageObject> listObjects(String prefix, int maxKeys);
+    List<FileInfo> listFiles(String prefix, int maxKeys);
 
     /**
-     * 生成预签名URL
+     * 获取预签名上传URL
      *
      * @param bucketName 存储桶名称
      * @param objectName 对象名称
      * @param expiry 过期时间（秒）
      * @return 预签名URL
      */
-    String generatePresignedUrl(String bucketName, String objectName, int expiry);
+    String getPresignedUploadUrl(String bucketName, String objectName, int expiry);
 
     /**
-     * 生成预签名URL（默认存储桶）
+     * 获取预签名下载URL
      *
+     * @param bucketName 存储桶名称
      * @param objectName 对象名称
      * @param expiry 过期时间（秒）
      * @return 预签名URL
      */
-    String generatePresignedUrl(String objectName, int expiry);
+    String getPresignedDownloadUrl(String bucketName, String objectName, int expiry);
 
     /**
      * 创建存储桶
@@ -169,4 +170,42 @@ public interface StorageService {
      * @return 是否存在
      */
     boolean bucketExists(String bucketName);
+
+    /**
+     * 文件信息
+     */
+    class FileInfo {
+        private String objectName;
+        private String etag;
+        private long size;
+        private String lastModified;
+        private String contentType;
+
+        // 构造函数
+        public FileInfo() {}
+
+        public FileInfo(String objectName, String etag, long size, String lastModified, String contentType) {
+            this.objectName = objectName;
+            this.etag = etag;
+            this.size = size;
+            this.lastModified = lastModified;
+            this.contentType = contentType;
+        }
+
+        // Getter和Setter
+        public String getObjectName() { return objectName; }
+        public void setObjectName(String objectName) { this.objectName = objectName; }
+
+        public String getEtag() { return etag; }
+        public void setEtag(String etag) { this.etag = etag; }
+
+        public long getSize() { return size; }
+        public void setSize(long size) { this.size = size; }
+
+        public String getLastModified() { return lastModified; }
+        public void setLastModified(String lastModified) { this.lastModified = lastModified; }
+
+        public String getContentType() { return contentType; }
+        public void setContentType(String contentType) { this.contentType = contentType; }
+    }
 }

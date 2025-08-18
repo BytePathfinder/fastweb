@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.data.redis.core.ZSetOperations;
+
 /**
  * 缓存服务接口
  *
@@ -202,7 +204,7 @@ public interface CacheService {
     /**
      * ZSet获取范围（带分数）
      */
-    Set<Object> zRangeWithScores(String key, long start, long end);
+    Set<ZSetOperations.TypedTuple<Object>> zRangeWithScores(String key, long start, long end);
 
     /**
      * ZSet大小

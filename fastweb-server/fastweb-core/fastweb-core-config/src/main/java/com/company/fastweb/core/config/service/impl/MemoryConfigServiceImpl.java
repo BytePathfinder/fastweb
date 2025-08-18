@@ -28,7 +28,8 @@ public class MemoryConfigServiceImpl implements ConfigService {
 
     @Override
     public String getConfig(String key) {
-        return getConfig(key, null);
+        ConfigItem item = configs.get(key);
+        return item != null ? item.getValue() : null;
     }
 
     @Override
@@ -133,17 +134,17 @@ public class MemoryConfigServiceImpl implements ConfigService {
     }
 
     @Override
-    public boolean exists(String key) {
+    public boolean hasConfig(String key) {
         return configs.containsKey(key);
     }
 
     @Override
-    public List<ConfigItem> getConfigList(String prefix) {
-        List<ConfigItem> result = new ArrayList<>();
+    public Map<String, String> getConfigs(String prefix) {
+        Map<String, String> result = new HashMap<>();
         for (Map.Entry<String, ConfigItem> entry : configs.entrySet()) {
             String key = entry.getKey();
             if (prefix == null || key.startsWith(prefix)) {
-                result.add(entry.getValue());
+                result.put(key, entry.getValue().getValue());
             }
         }
         return result;
@@ -196,7 +197,7 @@ public class MemoryConfigServiceImpl implements ConfigService {
         if (keyListeners != null) {
             for (ConfigChangeListener listener : keyListeners) {
                 try {
-                    listener.onChange(key, oldValue, newValue);
+                    listener.onConfigChange(key, oldValue, newValue);
                 } catch (Exception e) {
                     log.error("配置变更监听器执行失败: key={}", key, e);
                 }

@@ -1,14 +1,15 @@
 package com.company.fastweb.core.data.config;
 
-import com.company.fastweb.core.data.interceptor.TenantLineHandlerImpl;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Bean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
+
+import com.company.fastweb.core.data.properties.FastWebDataProperties;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 数据访问自动配置
@@ -27,6 +28,7 @@ import org.springframework.context.annotation.Import;
 @AutoConfiguration
 @ConditionalOnClass(name = "com.baomidou.mybatisplus.core.mapper.BaseMapper")
 @ComponentScan(basePackages = "com.company.fastweb.core.data")
+@EnableConfigurationProperties(FastWebDataProperties.class)
 @Import({MyBatisPlusConfig.class})
 public class DataAutoConfiguration {
 
@@ -34,14 +36,5 @@ public class DataAutoConfiguration {
         log.info("FastWeb Data Module initialized");
     }
 
-    /**
-     * 多租户处理器
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "fastweb.tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public TenantLineHandlerImpl tenantLineHandler() {
-        log.info("Tenant handler enabled");
-        return new TenantLineHandlerImpl();
-    }
+
 }

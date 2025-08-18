@@ -1,20 +1,19 @@
 package com.company.fastweb.core.storage.service.impl;
 
 import com.company.fastweb.core.exception.BizException;
-import com.company.fastweb.core.storage.config.StorageProperties;
-import com.company.fastweb.core.storage.service.StorageObject;
 import com.company.fastweb.core.storage.service.StorageService;
 import io.minio.*;
 import io.minio.messages.DeleteError;
 import io.minio.messages.DeleteObject;
 import io.minio.messages.Item;
+import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -31,26 +30,33 @@ import java.util.stream.Collectors;
 public class MinioStorageServiceImpl implements StorageService {
 
     private final MinioClient minioClient;
-    private final StorageProperties storageProperties;
+
+    @Value("${fastweb.storage.minio.default-bucket:fastweb}")
+    private String defaultBucket;
+
+    @Value("${fastweb.storage.minio.endpoint:}")
+    private String endpoint;
 
     @Override
-    public String upload(String bucketName, String objectName, InputStream inputStream, String contentType) {
+    public String uploadFile(String bucketName, String objectName, InputStream inputStream, String contentType) {
         try {
             // 确保存储桶存在
-            ensureBucketExists(bucketName);
+            if (!bucketExists(bucketName)) {
+                createBucket(bucketName);
+            }
 
             // 上传文件
             minioClient.putObject(
                 PutObjectArgs.builder()
                     .bucket(bucketName)
                     .object(objectName)
-                    .stream(inputStream, -1, 10485760) // 10MB part size
+                    .stream(inputStream, -1, 10485760) // 10MB
                     .contentType(contentType)
                     .build()
             );
 
-            // 返回访问URL
-            return getObjectUrl(bucketName, objectName);
+            log.info("文件上传成功: bucket={}, object={}", bucketName, objectName);
+            return getFileUrl(bucketName, objectName);
 
         } catch (Exception e) {
             log.error("文件上传失败: bucket={}, object={}", bucketName, objectName, e);
@@ -59,12 +65,12 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public String upload(String objectName, InputStream inputStream, String contentType) {
-        return upload(storageProperties.getDefaultBucket(), objectName, inputStream, contentType);
+    public String uploadFile(String objectName, InputStream inputStream, String contentType) {
+        return uploadFile(defaultBucket, objectName, inputStream, contentType);
     }
 
     @Override
-    public InputStream download(String bucketName, String objectName) {
+    public InputStream downloadFile(String bucketName, String objectName) {
         try {
             return minioClient.getObject(
                 GetObjectArgs.builder()
@@ -79,12 +85,12 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public InputStream download(String objectName) {
-        return download(storageProperties.getDefaultBucket(), objectName);
+    public InputStream downloadFile(String objectName) {
+        return downloadFile(defaultBucket, objectName);
     }
 
     @Override
-    public boolean delete(String bucketName, String objectName) {
+    public boolean deleteFile(String bucketName, String objectName) {
         try {
             minioClient.removeObject(
                 RemoveObjectArgs.builder()
@@ -92,6 +98,7 @@ public class MinioStorageServiceImpl implements StorageService {
                     .object(objectName)
                     .build()
             );
+            log.info("文件删除成功: bucket={}, object={}", bucketName, objectName);
             return true;
         } catch (Exception e) {
             log.error("文件删除失败: bucket={}, object={}", bucketName, objectName, e);
@@ -100,12 +107,12 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public boolean delete(String objectName) {
-        return delete(storageProperties.getDefaultBucket(), objectName);
+    public boolean deleteFile(String objectName) {
+        return deleteFile(defaultBucket, objectName);
     }
 
     @Override
-    public List<String> deleteMultiple(String bucketName, List<String> objectNames) {
+    public List<String> deleteFiles(String bucketName, List<String> objectNames) {
         List<String> errors = new ArrayList<>();
         try {
             List<DeleteObject> objects = objectNames.stream()
@@ -123,6 +130,8 @@ public class MinioStorageServiceImpl implements StorageService {
                 DeleteError error = result.get();
                 errors.add(error.objectName() + ": " + error.message());
             }
+
+            log.info("批量删除文件完成: bucket={}, total={}, errors={}", bucketName, objectNames.size(), errors.size());
         } catch (Exception e) {
             log.error("批量删除文件失败: bucket={}", bucketName, e);
             errors.add("批量删除失败: " + e.getMessage());
@@ -131,7 +140,7 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public boolean exists(String bucketName, String objectName) {
+    public boolean fileExists(String bucketName, String objectName) {
         try {
             minioClient.statObject(
                 StatObjectArgs.builder()
@@ -146,12 +155,12 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public boolean exists(String objectName) {
-        return exists(storageProperties.getDefaultBucket(), objectName);
+    public boolean fileExists(String objectName) {
+        return fileExists(defaultBucket, objectName);
     }
 
     @Override
-    public StorageObject getObjectInfo(String bucketName, String objectName) {
+    public FileInfo getFileInfo(String bucketName, String objectName) {
         try {
             StatObjectResponse stat = minioClient.statObject(
                 StatObjectArgs.builder()
@@ -160,18 +169,13 @@ public class MinioStorageServiceImpl implements StorageService {
                     .build()
             );
 
-            return StorageObject.builder()
-                .objectName(objectName)
-                .bucketName(bucketName)
-                .size(stat.size())
-                .contentType(stat.contentType())
-                .etag(stat.etag())
-                .lastModified(LocalDateTime.ofInstant(stat.lastModified().toInstant(), ZoneId.systemDefault()))
-                .url(getObjectUrl(bucketName, objectName))
-                .isDirectory(false)
-                .metadata(stat.userMetadata())
-                .build();
-
+            return new FileInfo(
+                objectName,
+                stat.etag(),
+                stat.size(),
+                stat.lastModified().toString(),
+                stat.contentType()
+            );
         } catch (Exception e) {
             log.error("获取文件信息失败: bucket={}, object={}", bucketName, objectName, e);
             throw BizException.of("FILE_INFO_ERROR", "获取文件信息失败: " + e.getMessage());
@@ -179,13 +183,13 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public StorageObject getObjectInfo(String objectName) {
-        return getObjectInfo(storageProperties.getDefaultBucket(), objectName);
+    public FileInfo getFileInfo(String objectName) {
+        return getFileInfo(defaultBucket, objectName);
     }
 
     @Override
-    public List<StorageObject> listObjects(String bucketName, String prefix, int maxKeys) {
-        List<StorageObject> objects = new ArrayList<>();
+    public List<FileInfo> listFiles(String bucketName, String prefix, int maxKeys) {
+        List<FileInfo> files = new ArrayList<>();
         try {
             Iterable<Result<Item>> results = minioClient.listObjects(
                 ListObjectsArgs.builder()
@@ -197,30 +201,45 @@ public class MinioStorageServiceImpl implements StorageService {
 
             for (Result<Item> result : results) {
                 Item item = result.get();
-                objects.add(StorageObject.builder()
-                    .objectName(item.objectName())
-                    .bucketName(bucketName)
-                    .size(item.size())
-                    .etag(item.etag())
-                    .lastModified(LocalDateTime.ofInstant(item.lastModified().toInstant(), ZoneId.systemDefault()))
-                    .url(getObjectUrl(bucketName, item.objectName()))
-                    .isDirectory(item.isDir())
-                    .build());
+                files.add(new FileInfo(
+                    item.objectName(),
+                    item.etag(),
+                    item.size(),
+                    item.lastModified().toString(),
+                    null // ListObjects不返回contentType
+                ));
             }
         } catch (Exception e) {
             log.error("列出文件失败: bucket={}, prefix={}", bucketName, prefix, e);
-            throw BizException.of("LIST_OBJECTS_ERROR", "列出文件失败: " + e.getMessage());
+            throw BizException.of("LIST_FILES_ERROR", "列出文件失败: " + e.getMessage());
         }
-        return objects;
+        return files;
     }
 
     @Override
-    public List<StorageObject> listObjects(String prefix, int maxKeys) {
-        return listObjects(storageProperties.getDefaultBucket(), prefix, maxKeys);
+    public List<FileInfo> listFiles(String prefix, int maxKeys) {
+        return listFiles(defaultBucket, prefix, maxKeys);
     }
 
     @Override
-    public String generatePresignedUrl(String bucketName, String objectName, int expiry) {
+    public String getPresignedUploadUrl(String bucketName, String objectName, int expiry) {
+        try {
+            return minioClient.getPresignedObjectUrl(
+                GetPresignedObjectUrlArgs.builder()
+                    .method(Method.PUT)
+                    .bucket(bucketName)
+                    .object(objectName)
+                    .expiry(expiry, TimeUnit.SECONDS)
+                    .build()
+            );
+        } catch (Exception e) {
+            log.error("获取预签名上传URL失败: bucket={}, object={}", bucketName, objectName, e);
+            throw BizException.of("PRESIGNED_URL_ERROR", "获取预签名URL失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public String getPresignedDownloadUrl(String bucketName, String objectName, int expiry) {
         try {
             return minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
@@ -231,14 +250,9 @@ public class MinioStorageServiceImpl implements StorageService {
                     .build()
             );
         } catch (Exception e) {
-            log.error("生成预签名URL失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("PRESIGNED_URL_ERROR", "生成预签名URL失败: " + e.getMessage());
+            log.error("获取预签名下载URL失败: bucket={}, object={}", bucketName, objectName, e);
+            throw BizException.of("PRESIGNED_URL_ERROR", "获取预签名URL失败: " + e.getMessage());
         }
-    }
-
-    @Override
-    public String generatePresignedUrl(String objectName, int expiry) {
-        return generatePresignedUrl(storageProperties.getDefaultBucket(), objectName, expiry);
     }
 
     @Override
@@ -254,7 +268,7 @@ public class MinioStorageServiceImpl implements StorageService {
             }
             return true;
         } catch (Exception e) {
-            log.error("创建存储桶失败: {}", bucketName, e);
+            log.error("存储桶创建失败: {}", bucketName, e);
             return false;
         }
     }
@@ -270,7 +284,7 @@ public class MinioStorageServiceImpl implements StorageService {
             log.info("存储桶删除成功: {}", bucketName);
             return true;
         } catch (Exception e) {
-            log.error("删除存储桶失败: {}", bucketName, e);
+            log.error("存储桶删除失败: {}", bucketName, e);
             return false;
         }
     }
@@ -290,24 +304,12 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     /**
-     * 确保存储桶存在
+     * 获取文件访问URL
      */
-    private void ensureBucketExists(String bucketName) {
-        if (!bucketExists(bucketName)) {
-            createBucket(bucketName);
+    private String getFileUrl(String bucketName, String objectName) {
+        if (endpoint != null && !endpoint.isEmpty()) {
+            return endpoint + "/" + bucketName + "/" + objectName;
         }
-    }
-
-    /**
-     * 获取对象访问URL
-     */
-    private String getObjectUrl(String bucketName, String objectName) {
-        if (storageProperties.isPublicRead()) {
-            return String.format("%s/%s/%s", 
-                storageProperties.getEndpoint(), bucketName, objectName);
-        } else {
-            // 生成临时访问URL
-            return generatePresignedUrl(bucketName, objectName, 3600); // 1小时有效期
-        }
+        return "/" + bucketName + "/" + objectName;
     }
 }

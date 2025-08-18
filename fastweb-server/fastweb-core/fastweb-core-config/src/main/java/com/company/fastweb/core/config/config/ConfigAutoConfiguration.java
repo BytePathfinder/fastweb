@@ -4,10 +4,9 @@ import com.company.fastweb.core.cache.service.CacheService;
 import com.company.fastweb.core.config.processor.ConfigValueProcessor;
 import com.company.fastweb.core.config.service.ConfigService;
 import com.company.fastweb.core.config.service.impl.CacheConfigServiceImpl;
-import com.company.fastweb.core.config.service.impl.MemoryConfigServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
@@ -18,27 +17,17 @@ import org.springframework.context.annotation.Bean;
  */
 @Slf4j
 @AutoConfiguration
+@ConditionalOnClass(CacheService.class)
 public class ConfigAutoConfiguration {
 
     /**
-     * 基于缓存的配置服务
+     * 配置服务
      */
     @Bean
-    @ConditionalOnBean(CacheService.class)
     @ConditionalOnMissingBean
-    public ConfigService cacheConfigService(CacheService cacheService) {
-        log.info("Cache-based Config Service initialized");
+    public ConfigService configService(CacheService cacheService) {
+        log.info("FastWeb Config Service initialized");
         return new CacheConfigServiceImpl(cacheService);
-    }
-
-    /**
-     * 基于内存的配置服务（fallback）
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public ConfigService memoryConfigService() {
-        log.info("Memory-based Config Service initialized");
-        return new MemoryConfigServiceImpl();
     }
 
     /**
@@ -47,7 +36,7 @@ public class ConfigAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ConfigValueProcessor configValueProcessor(ConfigService configService) {
-        log.info("Config Value Processor initialized");
+        log.info("FastWeb Config Value Processor initialized");
         return new ConfigValueProcessor(configService);
     }
 }
