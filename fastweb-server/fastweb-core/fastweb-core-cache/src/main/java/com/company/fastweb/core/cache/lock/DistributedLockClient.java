@@ -2,12 +2,18 @@ package com.company.fastweb.core.cache.lock;
 
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 
 /**
  * Redisson 分布式锁客户端
  */
+@Component
+@ConditionalOnClass(RedissonClient.class)
+@ConditionalOnBean(RedissonClient.class)
 public class DistributedLockClient {
 
     private final RedissonClient redissonClient;
@@ -38,7 +44,7 @@ public class DistributedLockClient {
     }
 
     public void unlock(RLock lock) {
-        if (lock != null && lock.isLocked()) {
+        if (lock != null && lock.isHeldByCurrentThread()) {
             lock.unlock();
         }
     }

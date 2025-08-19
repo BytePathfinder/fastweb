@@ -35,7 +35,7 @@
         <flyway.version>11.11.0</flyway.version>
 
         <!-- 中间件与服务 -->
-        <minio.version>8.5.7</minio.version>
+        <minio.version>8.2.1</minio.version>
         <sa-token.version>1.37.0</sa-token.version>
         <p6spy.version>3.9.1</p6spy.version>
         <jsqlparser.version>4.9</jsqlparser.version>
@@ -47,8 +47,11 @@
         <hutool.version>5.8.39</hutool.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
 
+        <!-- 测试相关 -->
+        <testcontainers.version>1.19.8</testcontainers.version>
+
         <!-- 安全修复 -->
-        <logback-version>1.4.14</logback-version>
+        <logback-version>1.5.12</logback-version>
         <netty.version>4.1.118.Final</netty.version>
         <bouncycastle.version>1.78</bouncycastle.version>
         <commons-compress.version>1.26.0</commons-compress.version>
@@ -62,6 +65,15 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Testcontainers BOM 管理 -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -231,6 +243,25 @@
 
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
     <repositories>
         <repository>

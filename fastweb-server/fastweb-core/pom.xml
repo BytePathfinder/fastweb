@@ -9,29 +9,29 @@
 
     <artifactId>fastweb-core</artifactId>
     <packaging>pom</packaging>
-    
+
     <modules>
-        <module>fastweb-core-common</module>
-        <module>fastweb-core-i18n</module>
-        <module>fastweb-core-rule</module>
-        <module>fastweb-core-doc</module>
-        <module>fastweb-core-search</module>
-        <module>fastweb-core-data</module>
-        <module>fastweb-core-cache</module>
-        <module>fastweb-core-message</module>
-        <module>fastweb-core-storage</module>
-        <module>fastweb-core-workflow</module>
-        <module>fastweb-core-testing</module>
-        <module>fastweb-core-security</module>
-        <module>fastweb-core-exception</module>
         <module>fastweb-core-audit</module>
-        <module>fastweb-core-tenant</module>
-        <module>fastweb-core-config</module>
-        <module>fastweb-core-task</module>
-        <module>fastweb-core-batch</module>
+        <module>fastweb-core-cache</module>
+        <module>fastweb-core-common</module>
+        <module>fastweb-core-data</module>
+        <module>fastweb-core-doc</module>
+        <module>fastweb-core-exception</module>
+        <module>fastweb-core-message</module>
         <module>fastweb-core-monitor</module>
-        <module>fastweb-core-deploy</module>
-        <module>fastweb-core-ai</module>
+        <module>fastweb-core-security</module>
+        <module>fastweb-core-storage</module>
+        <module>fastweb-core-task</module>
+        <module>fastweb-core-tenant</module>
+        <!-- <module>fastweb-core-search</module> -->
+        <!-- <module>fastweb-core-config</module> -->
+        <!-- <module>fastweb-core-rule</module> -->
+        <!-- <module>fastweb-core-i18n</module> -->
+        <!-- <module>fastweb-core-workflow</module> -->
+        <!-- <module>fastweb-core-testing</module> -->
+        <!-- <module>fastweb-core-batch</module> -->
+        <!-- <module>fastweb-core-deploy</module> -->
+        <!-- <module>fastweb-core-ai</module> -->
     </modules>
 
 </project>

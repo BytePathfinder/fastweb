@@ -36,7 +36,7 @@ fastweb:
         redis:
           enabled: true
 
-# Spring Redis 基础配置 (供 RedisTemplate 和 RedisCacheManager 使用)
+# Spring Redis 基础配置 (供 RedisTemplate、RedisCacheManager 和 Redisson 使用)
 spring:
   data:
     redis:
@@ -45,23 +45,10 @@ spring:
       password: ""
       database: 0
       timeout: 3000ms
+      connect-timeout: 10000ms
+      client-name: "fastweb-cache"
       lettuce:
         pool:
           max-active: 8
           max-idle: 8
           min-idle: 0
-
-  # Redisson 分布式锁配置 (由 redisson-spring-boot-starter 自动加载)
-  redisson:
-    # Redisson 配置文件路径，如果使用下面的配置，则无需指定 file
-    # file: classpath:redisson.yaml 
-    single-server-config:
-      address: "redis://${spring.data.redis.host}:${spring.data.redis.port}"
-      password: ${spring.data.redis.password}
-      database: ${spring.data.redis.database}
-      client-name: "fastweb-cache"
-      connection-pool-size: 64
-      connection-minimum-idle-size: 10
-      subscription-connection-pool-size: 50
-      connect-timeout: 10000
-      timeout: 3000

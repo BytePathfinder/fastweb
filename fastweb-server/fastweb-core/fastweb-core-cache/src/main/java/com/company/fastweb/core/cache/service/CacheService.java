@@ -1,235 +1,115 @@
 package com.company.fastweb.core.cache.service;
 
-import java.time.Duration;
-import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import org.springframework.data.redis.core.ZSetOperations;
 
 /**
  * 缓存服务接口
- *
+ * 提供统一的缓存操作接口，支持 Redis 和本地缓存
+ * 
  * @author FastWeb
  */
 public interface CacheService {
 
-    // ========== String 操作 ==========
-
     /**
      * 设置缓存
+     * 
+     * @param key   缓存键
+     * @param value 缓存值
      */
     void set(String key, Object value);
 
     /**
      * 设置缓存（带过期时间）
+     * 
+     * @param key     缓存键
+     * @param value   缓存值
+     * @param timeout 过期时间（秒）
      */
-    void set(String key, Object value, Duration timeout);
-
-    /**
-     * 设置缓存（带过期时间）
-     */
-    void set(String key, Object value, long timeout, TimeUnit unit);
+    void set(String key, Object value, long timeout);
 
     /**
      * 获取缓存
+     * 
+     * @param key   缓存键
+     * @param clazz 值类型
+     * @return 缓存值
      */
-    <T> T get(String key, Class<T> type);
+    <T> T get(String key, Class<T> clazz);
 
     /**
-     * 获取缓存（带默认值）
+     * 获取缓存（字符串类型）
+     * 
+     * @param key 缓存键
+     * @return 缓存值
      */
-    <T> T get(String key, Class<T> type, T defaultValue);
+    String get(String key);
 
     /**
      * 删除缓存
+     * 
+     * @param key 缓存键
      */
-    Boolean delete(String key);
+    void delete(String key);
 
     /**
-     * 批量删除缓存
+     * 检查缓存是否存在
+     * 
+     * @param key 缓存键
+     * @return 是否存在
      */
-    Long delete(Collection<String> keys);
-
-    /**
-     * 判断key是否存在
-     */
-    Boolean hasKey(String key);
-
-    /**
-     * 设置过期时间
-     */
-    Boolean expire(String key, Duration timeout);
+    boolean exists(String key);
 
     /**
      * 设置过期时间
+     * 
+     * @param key     缓存键
+     * @param timeout 过期时间（秒）
      */
-    Boolean expire(String key, long timeout, TimeUnit unit);
+    void expire(String key, long timeout);
 
     /**
-     * 获取过期时间
+     * 获取剩余过期时间
+     * 
+     * @param key 缓存键
+     * @return 剩余过期时间（秒），-1表示永不过期，-2表示不存在
      */
-    Long getExpire(String key);
+    long getExpire(String key);
 
     /**
-     * 移除过期时间
+     * 清空指定缓存区域
+     * 
+     * @param cacheName 缓存区域名称
      */
-    Boolean persist(String key);
-
-    // ========== Hash 操作 ==========
+    void clear(String cacheName);
 
     /**
-     * Hash设置
+     * 获取缓存信息
+     * 
+     * @return 缓存统计信息
      */
-    void hSet(String key, String hashKey, Object value);
+    Map<String, Object> getInfo();
 
     /**
-     * Hash获取
-     */
-    <T> T hGet(String key, String hashKey, Class<T> type);
-
-    /**
-     * Hash批量设置
-     */
-    void hSetAll(String key, Map<String, Object> map);
-
-    /**
-     * Hash批量获取
-     */
-    Map<String, Object> hGetAll(String key);
-
-    /**
-     * Hash删除
-     */
-    Long hDelete(String key, String... hashKeys);
-
-    /**
-     * Hash判断是否存在
-     */
-    Boolean hHasKey(String key, String hashKey);
-
-    /**
-     * Hash获取所有key
-     */
-    Set<String> hKeys(String key);
-
-    /**
-     * Hash获取所有value
-     */
-    List<Object> hValues(String key);
-
-    /**
-     * Hash大小
-     */
-    Long hSize(String key);
-
-    // ========== List 操作 ==========
-
-    /**
-     * List左推入
-     */
-    Long lLeftPush(String key, Object value);
-
-    /**
-     * List右推入
-     */
-    Long lRightPush(String key, Object value);
-
-    /**
-     * List左弹出
-     */
-    <T> T lLeftPop(String key, Class<T> type);
-
-    /**
-     * List右弹出
-     */
-    <T> T lRightPop(String key, Class<T> type);
-
-    /**
-     * List获取范围
-     */
-    <T> List<T> lRange(String key, long start, long end, Class<T> type);
-
-    /**
-     * List大小
-     */
-    Long lSize(String key);
-
-    // ========== Set 操作 ==========
-
-    /**
-     * Set添加
-     */
-    Long sAdd(String key, Object... values);
-
-    /**
-     * Set移除
-     */
-    Long sRemove(String key, Object... values);
-
-    /**
-     * Set获取所有成员
-     */
-    <T> Set<T> sMembers(String key, Class<T> type);
-
-    /**
-     * Set判断是否存在
-     */
-    Boolean sIsMember(String key, Object value);
-
-    /**
-     * Set大小
-     */
-    Long sSize(String key);
-
-    // ========== ZSet 操作 ==========
-
-    /**
-     * ZSet添加
-     */
-    Boolean zAdd(String key, Object value, double score);
-
-    /**
-     * ZSet移除
-     */
-    Long zRemove(String key, Object... values);
-
-    /**
-     * ZSet获取范围
-     */
-    <T> Set<T> zRange(String key, long start, long end, Class<T> type);
-
-    /**
-     * ZSet获取范围（带分数）
-     */
-    Set<ZSetOperations.TypedTuple<Object>> zRangeWithScores(String key, long start, long end);
-
-    /**
-     * ZSet大小
-     */
-    Long zSize(String key);
-
-    /**
-     * ZSet获取分数
-     */
-    Double zScore(String key, Object value);
-
-    // ========== 通用操作 ==========
-
-    /**
-     * 获取匹配的key
+     * 根据模式匹配获取键集合
+     * 
+     * @param pattern 匹配模式（支持通配符 *）
+     * @return 匹配的键集合
      */
     Set<String> keys(String pattern);
 
     /**
-     * 清空所有缓存
+     * 批量删除缓存
+     * 
+     * @param keys 缓存键集合
      */
-    void flushAll();
+    void delete(Set<String> keys);
 
     /**
-     * 获取缓存信息
+     * 检查缓存键是否存在（别名方法）
+     * 
+     * @param key 缓存键
+     * @return 是否存在
      */
-    Map<String, Object> getInfo();
+    boolean hasKey(String key);
 }

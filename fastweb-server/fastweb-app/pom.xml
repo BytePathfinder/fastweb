@@ -73,6 +73,27 @@
             <artifactId>fastweb-core-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
+        
+        <!-- fastweb-core-config 模块暂未实现，先注释掉 -->
+        <!--
+        <dependency>
+            <groupId>com.company</groupId>
+            <artifactId>fastweb-core-config</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        -->
+        
+        <dependency>
+            <groupId>com.company</groupId>
+            <artifactId>fastweb-core-monitor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.company</groupId>
+            <artifactId>fastweb-core-storage</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Business Modules -->
         <!-- 暂时注释掉，等user和auth模块创建后再启用 -->
@@ -83,15 +104,8 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring-boot.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
                 <configuration>
+                    <mainClass>com.company.fastweb.app.Application</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

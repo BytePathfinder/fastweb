@@ -1,8 +1,11 @@
 package com.company.fastweb.core.storage.service.impl;
 
-import com.company.fastweb.core.exception.BizException;
+import com.company.fastweb.core.storage.exception.StorageException;
 import com.company.fastweb.core.storage.service.StorageService;
+import com.company.fastweb.core.storage.service.StorageService.FileInfo;
+import com.company.fastweb.core.storage.util.StorageRetryUtil;
 import io.minio.*;
+import io.minio.errors.*;
 import io.minio.messages.DeleteError;
 import io.minio.messages.DeleteObject;
 import io.minio.messages.Item;
@@ -12,7 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +32,6 @@ import java.util.stream.Collectors;
  * @author FastWeb
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class MinioStorageServiceImpl implements StorageService {
 
@@ -39,29 +45,31 @@ public class MinioStorageServiceImpl implements StorageService {
 
     @Override
     public String uploadFile(String bucketName, String objectName, InputStream inputStream, String contentType) {
-        try {
-            // 确保存储桶存在
-            if (!bucketExists(bucketName)) {
-                createBucket(bucketName);
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                // 确保存储桶存在
+                if (!bucketExists(bucketName)) {
+                    createBucket(bucketName);
+                }
+
+                // 上传文件
+                minioClient.putObject(
+                    PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .stream(inputStream, -1, 10485760) // 10MB
+                        .contentType(contentType)
+                        .build()
+                );
+
+                log.info("文件上传成功: bucket={}, object={}", bucketName, objectName);
+                return getFileUrl(bucketName, objectName);
+
+            } catch (MinioException | IOException | InvalidKeyException | NoSuchAlgorithmException e) {
+                log.error("文件上传失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileUploadError(bucketName, objectName, e);
             }
-
-            // 上传文件
-            minioClient.putObject(
-                PutObjectArgs.builder()
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .stream(inputStream, -1, 10485760) // 10MB
-                    .contentType(contentType)
-                    .build()
-            );
-
-            log.info("文件上传成功: bucket={}, object={}", bucketName, objectName);
-            return getFileUrl(bucketName, objectName);
-
-        } catch (Exception e) {
-            log.error("文件上传失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("FILE_UPLOAD_ERROR", "文件上传失败: " + e.getMessage());
-        }
+        }, String.format("uploadFile(bucket=%s, object=%s)", bucketName, objectName));
     }
 
     @Override
@@ -71,17 +79,21 @@ public class MinioStorageServiceImpl implements StorageService {
 
     @Override
     public InputStream downloadFile(String bucketName, String objectName) {
-        try {
-            return minioClient.getObject(
-                GetObjectArgs.builder()
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .build()
-            );
-        } catch (Exception e) {
-            log.error("文件下载失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("FILE_DOWNLOAD_ERROR", "文件下载失败: " + e.getMessage());
-        }
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                InputStream inputStream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .build()
+                );
+                log.debug("文件下载成功: bucket={}, object={}", bucketName, objectName);
+                return inputStream;
+            } catch (MinioException | IOException | InvalidKeyException | NoSuchAlgorithmException e) {
+                log.error("文件下载失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileDownloadError(bucketName, objectName, e);
+            }
+        }, String.format("downloadFile(bucket=%s, object=%s)", bucketName, objectName));
     }
 
     @Override
@@ -91,19 +103,21 @@ public class MinioStorageServiceImpl implements StorageService {
 
     @Override
     public boolean deleteFile(String bucketName, String objectName) {
-        try {
-            minioClient.removeObject(
-                RemoveObjectArgs.builder()
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .build()
-            );
-            log.info("文件删除成功: bucket={}, object={}", bucketName, objectName);
-            return true;
-        } catch (Exception e) {
-            log.error("文件删除失败: bucket={}, object={}", bucketName, objectName, e);
-            return false;
-        }
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .build()
+                );
+                log.info("文件删除成功: bucket={}, object={}", bucketName, objectName);
+                return true;
+            } catch (MinioException | IOException | InvalidKeyException | NoSuchAlgorithmException e) {
+                log.error("文件删除失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileDeleteError(bucketName, objectName, e);
+            }
+        }, String.format("deleteFile(bucket=%s, object=%s)", bucketName, objectName));
     }
 
     @Override
@@ -161,25 +175,36 @@ public class MinioStorageServiceImpl implements StorageService {
 
     @Override
     public FileInfo getFileInfo(String bucketName, String objectName) {
-        try {
-            StatObjectResponse stat = minioClient.statObject(
-                StatObjectArgs.builder()
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .build()
-            );
-
-            return new FileInfo(
-                objectName,
-                stat.etag(),
-                stat.size(),
-                stat.lastModified().toString(),
-                stat.contentType()
-            );
-        } catch (Exception e) {
-            log.error("获取文件信息失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("FILE_INFO_ERROR", "获取文件信息失败: " + e.getMessage());
-        }
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                StatObjectResponse stat = minioClient.statObject(
+                    StatObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .build()
+                );
+                
+                FileInfo fileInfo = new FileInfo(
+                    objectName,
+                    stat.etag(),
+                    stat.size(),
+                    stat.lastModified().toString(),
+                    stat.contentType()
+                );
+                log.debug("获取文件信息成功: bucket={}, object={}, size={}", bucketName, objectName, stat.size());
+                return fileInfo;
+            } catch (ErrorResponseException e) {
+                if ("NoSuchKey".equals(e.errorResponse().code())) {
+                    log.debug("文件不存在: bucket={}, object={}", bucketName, objectName);
+                    return null;
+                }
+                log.error("获取文件信息失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileInfoError(bucketName, objectName, e);
+            } catch (MinioException | IOException | InvalidKeyException | NoSuchAlgorithmException e) {
+                log.error("获取文件信息失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileInfoError(bucketName, objectName, e);
+            }
+        }, String.format("getFileInfo(bucket=%s, object=%s)", bucketName, objectName));
     }
 
     @Override
@@ -211,7 +236,7 @@ public class MinioStorageServiceImpl implements StorageService {
             }
         } catch (Exception e) {
             log.error("列出文件失败: bucket={}, prefix={}", bucketName, prefix, e);
-            throw BizException.of("LIST_FILES_ERROR", "列出文件失败: " + e.getMessage());
+            throw StorageException.listObjectsError(bucketName, prefix, e);
         }
         return files;
     }
@@ -234,7 +259,7 @@ public class MinioStorageServiceImpl implements StorageService {
             );
         } catch (Exception e) {
             log.error("获取预签名上传URL失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("PRESIGNED_URL_ERROR", "获取预签名URL失败: " + e.getMessage());
+            throw StorageException.presignedUrlError(bucketName, objectName, e);
         }
     }
 
@@ -251,7 +276,7 @@ public class MinioStorageServiceImpl implements StorageService {
             );
         } catch (Exception e) {
             log.error("获取预签名下载URL失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("PRESIGNED_URL_ERROR", "获取预签名URL失败: " + e.getMessage());
+            throw StorageException.presignedUrlError(bucketName, objectName, e);
         }
     }
 
@@ -308,8 +333,12 @@ public class MinioStorageServiceImpl implements StorageService {
      */
     private String getFileUrl(String bucketName, String objectName) {
         if (endpoint != null && !endpoint.isEmpty()) {
-            return endpoint + "/" + bucketName + "/" + objectName;
+            // 确保endpoint以/结尾，objectName不以/开头
+            String normalizedEndpoint = endpoint.endsWith("/") ? endpoint : endpoint + "/";
+            String normalizedObjectName = objectName.startsWith("/") ? objectName.substring(1) : objectName;
+            return normalizedEndpoint + bucketName + "/" + normalizedObjectName;
         }
+        // 对于没有配置endpoint的情况，返回相对路径（需要配合Controller使用）
         return "/" + bucketName + "/" + objectName;
     }
 }

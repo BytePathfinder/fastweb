@@ -2,14 +2,17 @@ package com.company.fastweb.core.storage.service.impl;
 
 import com.company.fastweb.core.exception.BizException;
 import com.company.fastweb.core.storage.config.StorageProperties;
+import com.company.fastweb.core.storage.exception.StorageException;
 import com.company.fastweb.core.storage.service.StorageObject;
 import com.company.fastweb.core.storage.service.StorageService;
+import com.company.fastweb.core.storage.util.StorageRetryUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -22,7 +25,6 @@ import java.util.stream.Stream;
  * @author FastWeb
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class LocalStorageServiceImpl implements StorageService {
 
@@ -30,23 +32,25 @@ public class LocalStorageServiceImpl implements StorageService {
 
     @Override
     public String uploadFile(String bucketName, String objectName, InputStream inputStream, String contentType) {
-        try {
-            Path bucketPath = getBucketPath(bucketName);
-            Path filePath = bucketPath.resolve(objectName);
-            
-            // 创建目录
-            Files.createDirectories(filePath.getParent());
-            
-            // 写入文件
-            Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
-            
-            log.info("文件上传成功: bucket={}, object={}", bucketName, objectName);
-            return getObjectUrl(bucketName, objectName);
-            
-        } catch (IOException e) {
-            log.error("文件上传失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("FILE_UPLOAD_ERROR", "文件上传失败: " + e.getMessage());
-        }
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                Path bucketPath = getBucketPath(bucketName);
+                Path filePath = bucketPath.resolve(objectName);
+                
+                // 创建目录
+                Files.createDirectories(filePath.getParent());
+                
+                // 写入文件
+                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+                
+                log.info("文件上传成功: bucket={}, object={}", bucketName, objectName);
+                return getObjectUrl(bucketName, objectName);
+                
+            } catch (IOException e) {
+                log.error("文件上传失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileUploadError(bucketName, objectName, e);
+            }
+        }, String.format("uploadFile(bucket=%s, object=%s)", bucketName, objectName));
     }
 
     @Override
@@ -56,16 +60,20 @@ public class LocalStorageServiceImpl implements StorageService {
 
     @Override
     public InputStream downloadFile(String bucketName, String objectName) {
-        try {
-            Path filePath = getBucketPath(bucketName).resolve(objectName);
-            if (!Files.exists(filePath)) {
-                throw BizException.of("FILE_NOT_FOUND", "文件不存在: " + objectName);
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                Path filePath = getBucketPath(bucketName).resolve(objectName);
+                if (!Files.exists(filePath)) {
+                    log.warn("文件不存在: bucket={}, object={}", bucketName, objectName);
+                    throw StorageException.fileNotFound(bucketName, objectName);
+                }
+                log.debug("文件下载开始: bucket={}, object={}", bucketName, objectName);
+                return Files.newInputStream(filePath);
+            } catch (IOException e) {
+                log.error("文件下载失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileDownloadError(bucketName, objectName, e);
             }
-            return Files.newInputStream(filePath);
-        } catch (IOException e) {
-            log.error("文件下载失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("FILE_DOWNLOAD_ERROR", "文件下载失败: " + e.getMessage());
-        }
+        }, String.format("downloadFile(bucket=%s, object=%s)", bucketName, objectName));
     }
 
     @Override
@@ -76,14 +84,23 @@ public class LocalStorageServiceImpl implements StorageService {
     @Override
     public boolean deleteFile(String bucketName, String objectName) {
         try {
-            Path filePath = getBucketPath(bucketName).resolve(objectName);
-            boolean deleted = Files.deleteIfExists(filePath);
-            if (deleted) {
-                log.info("文件删除成功: bucket={}, object={}", bucketName, objectName);
-            }
-            return deleted;
-        } catch (IOException e) {
-            log.error("文件删除失败: bucket={}, object={}", bucketName, objectName, e);
+            return StorageRetryUtil.executeWithRetry(() -> {
+                try {
+                    Path filePath = getBucketPath(bucketName).resolve(objectName);
+                    boolean deleted = Files.deleteIfExists(filePath);
+                    if (deleted) {
+                        log.info("文件删除成功: bucket={}, object={}", bucketName, objectName);
+                    } else {
+                        log.debug("文件不存在，无需删除: bucket={}, object={}", bucketName, objectName);
+                    }
+                    return deleted;
+                } catch (IOException e) {
+                    log.error("文件删除失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                    throw StorageException.fileUploadError(bucketName, objectName, e);
+                }
+            }, String.format("deleteFile(bucket=%s, object=%s)", bucketName, objectName));
+        } catch (StorageException e) {
+            log.warn("文件删除操作失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage());
             return false;
         }
     }
@@ -117,24 +134,28 @@ public class LocalStorageServiceImpl implements StorageService {
 
     @Override
     public FileInfo getFileInfo(String bucketName, String objectName) {
-        try {
-            Path filePath = getBucketPath(bucketName).resolve(objectName);
-            if (!Files.exists(filePath)) {
-                throw BizException.of("FILE_NOT_FOUND", "文件不存在: " + objectName);
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                Path filePath = getBucketPath(bucketName).resolve(objectName);
+                if (!Files.exists(filePath)) {
+                    log.debug("文件不存在: bucket={}, object={}", bucketName, objectName);
+                    return null;
+                }
+
+                String contentType = Files.probeContentType(filePath);
+                long size = Files.size(filePath);
+                String lastModified = Files.getLastModifiedTime(filePath).toString();
+                // ETag is not readily available for local files, so we'll use an empty string.
+                String etag = "";
+
+                log.debug("获取文件信息成功: bucket={}, object={}, size={}", bucketName, objectName, size);
+                return new FileInfo(objectName, etag, size, lastModified, contentType);
+
+            } catch (IOException e) {
+                log.error("获取文件信息失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+                throw StorageException.fileInfoError(bucketName, objectName, e);
             }
-
-            String contentType = Files.probeContentType(filePath);
-            long size = Files.size(filePath);
-            String lastModified = Files.getLastModifiedTime(filePath).toString();
-            // ETag is not readily available for local files, so we'll use an empty string.
-            String etag = "";
-
-            return new FileInfo(objectName, etag, size, lastModified, contentType);
-
-        } catch (IOException e) {
-            log.error("获取文件信息失败: bucket={}, object={}", bucketName, objectName, e);
-            throw BizException.of("FILE_INFO_ERROR", "获取文件信息失败: " + e.getMessage());
-        }
+        }, String.format("getFileInfo(bucket=%s, object=%s)", bucketName, objectName));
     }
 
     @Override
@@ -144,38 +165,42 @@ public class LocalStorageServiceImpl implements StorageService {
 
     @Override
     public List<FileInfo> listFiles(String bucketName, String prefix, int maxKeys) {
-        List<FileInfo> files = new ArrayList<>();
-        try {
-            Path bucketPath = getBucketPath(bucketName);
-            if (!Files.exists(bucketPath)) {
-                return files;
-            }
+        return StorageRetryUtil.executeWithRetry(() -> {
+            List<FileInfo> files = new ArrayList<>();
+            try {
+                Path bucketPath = getBucketPath(bucketName);
+                if (!Files.exists(bucketPath)) {
+                    log.debug("存储桶不存在: bucket={}", bucketName);
+                    return files;
+                }
 
-            try (Stream<Path> paths = Files.walk(bucketPath)) {
-                paths.filter(Files::isRegularFile)
-                    .filter(path -> {
-                        String relativePath = bucketPath.relativize(path).toString().replace("\\", "/");
-                        return prefix == null || relativePath.startsWith(prefix);
-                    })
-                    .limit(maxKeys)
-                    .forEach(path -> {
-                        try {
-                            String objectName = bucketPath.relativize(path).toString().replace("\\", "/");
-                            String contentType = Files.probeContentType(path);
-                            long size = Files.size(path);
-                            String lastModified = Files.getLastModifiedTime(path).toString();
-                            
-                            files.add(new FileInfo(objectName, "", size, lastModified, contentType));
-                        } catch (IOException e) {
-                            log.warn("获取文件信息失败: {}", path, e);
-                        }
-                    });
+                try (Stream<Path> paths = Files.walk(bucketPath)) {
+                    paths.filter(Files::isRegularFile)
+                        .filter(path -> {
+                            String relativePath = bucketPath.relativize(path).toString().replace("\\", "/");
+                            return prefix == null || relativePath.startsWith(prefix);
+                        })
+                        .limit(maxKeys)
+                        .forEach(path -> {
+                            try {
+                                String objectName = bucketPath.relativize(path).toString().replace("\\", "/");
+                                String contentType = Files.probeContentType(path);
+                                long size = Files.size(path);
+                                String lastModified = Files.getLastModifiedTime(path).toString();
+                                
+                                files.add(new FileInfo(objectName, "", size, lastModified, contentType));
+                            } catch (IOException e) {
+                                log.warn("获取文件信息失败: path={}, error={}", path, e.getMessage());
+                            }
+                        });
+                }
+                log.debug("列出文件成功: bucket={}, prefix={}, count={}", bucketName, prefix, files.size());
+            } catch (IOException e) {
+                log.error("列出文件失败: bucket={}, prefix={}, error={}", bucketName, prefix, e.getMessage(), e);
+                throw StorageException.listObjectsError(bucketName, prefix, e);
             }
-        } catch (IOException e) {
-            log.error("列出文件失败: bucket={}, prefix={}", bucketName, prefix, e);
-            throw BizException.of("LIST_OBJECTS_ERROR", "列出文件失败: " + e.getMessage());
-        }
-        return files;
+            return files;
+        }, String.format("listFiles(bucket=%s, prefix=%s, maxKeys=%d)", bucketName, prefix, maxKeys));
     }
 
     @Override
@@ -185,14 +210,35 @@ public class LocalStorageServiceImpl implements StorageService {
 
     @Override
     public String getPresignedUploadUrl(String bucketName, String objectName, int expiry) {
-        // 本地存储不支持预签名，直接返回访问URL
-        return getObjectUrl(bucketName, objectName);
+        try {
+            // 本地存储不支持预签名URL，返回直接上传URL
+            String url = String.format("/api/storage/upload?bucket=%s&object=%s", bucketName, objectName);
+            log.debug("生成预签名上传URL: bucket={}, object={}, url={}", bucketName, objectName, url);
+            return url;
+        } catch (Exception e) {
+            log.error("生成预签名上传URL失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+            throw StorageException.presignedUrlError(bucketName, objectName, e);
+        }
     }
 
     @Override
     public String getPresignedDownloadUrl(String bucketName, String objectName, int expiry) {
-        // 本地存储不支持预签名，直接返回访问URL
-        return getObjectUrl(bucketName, objectName);
+        try {
+            // 验证文件是否存在
+            if (!fileExists(bucketName, objectName)) {
+                throw StorageException.fileNotFound(bucketName, objectName);
+            }
+            
+            // 本地存储不支持预签名URL，返回直接下载URL
+            String url = String.format("/api/storage/download?bucket=%s&object=%s", bucketName, objectName);
+            log.debug("生成预签名下载URL: bucket={}, object={}, url={}", bucketName, objectName, url);
+            return url;
+        } catch (StorageException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("生成预签名下载URL失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
+            throw StorageException.presignedUrlError(bucketName, objectName, e);
+        }
     }
 
     // 删除以下无用方法
@@ -203,47 +249,68 @@ public class LocalStorageServiceImpl implements StorageService {
 
     @Override
     public boolean createBucket(String bucketName) {
-        try {
-            Path bucketPath = getBucketPath(bucketName);
-            Files.createDirectories(bucketPath);
-            log.info("存储桶创建成功: {}", bucketName);
-            return true;
-        } catch (IOException e) {
-            log.error("创建存储桶失败: {}", bucketName, e);
-            return false;
-        }
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                Path bucketPath = getBucketPath(bucketName);
+                if (Files.exists(bucketPath)) {
+                    log.debug("存储桶已存在: bucket={}", bucketName);
+                    return false;
+                }
+                
+                Files.createDirectories(bucketPath);
+                log.info("创建存储桶成功: bucket={}, path={}", bucketName, bucketPath);
+                return true;
+            } catch (IOException e) {
+                log.error("创建存储桶失败: bucket={}, error={}", bucketName, e.getMessage(), e);
+                throw StorageException.bucketOperationError(bucketName, "create", e);
+            }
+        }, String.format("createBucket(bucket=%s)", bucketName));
     }
 
     @Override
     public boolean deleteBucket(String bucketName) {
-        try {
-            Path bucketPath = getBucketPath(bucketName);
-            if (Files.exists(bucketPath)) {
-                // 删除目录及其所有内容
-                try (Stream<Path> paths = Files.walk(bucketPath)) {
-                    paths.sorted((a, b) -> b.compareTo(a)) // 先删除文件，再删除目录
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException e) {
-                                log.warn("删除文件失败: {}", path, e);
-                            }
-                        });
+        return StorageRetryUtil.executeWithRetry(() -> {
+            try {
+                Path bucketPath = getBucketPath(bucketName);
+                if (!Files.exists(bucketPath)) {
+                    log.debug("存储桶不存在，无需删除: bucket={}", bucketName);
+                    return false;
                 }
-                log.info("存储桶删除成功: {}", bucketName);
+                
+                // 删除目录及其所有内容
+                Files.walkFileTree(bucketPath, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        Files.delete(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                        Files.delete(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+                log.info("删除存储桶成功: bucket={}, path={}", bucketName, bucketPath);
                 return true;
+            } catch (IOException e) {
+                log.error("删除存储桶失败: bucket={}, error={}", bucketName, e.getMessage(), e);
+                throw StorageException.bucketOperationError(bucketName, "delete", e);
             }
-            return false;
-        } catch (IOException e) {
-            log.error("删除存储桶失败: {}", bucketName, e);
-            return false;
-        }
+        }, String.format("deleteBucket(bucket=%s)", bucketName));
     }
 
     @Override
     public boolean bucketExists(String bucketName) {
-        Path bucketPath = getBucketPath(bucketName);
-        return Files.exists(bucketPath) && Files.isDirectory(bucketPath);
+        try {
+            Path bucketPath = getBucketPath(bucketName);
+            boolean exists = Files.exists(bucketPath) && Files.isDirectory(bucketPath);
+            log.debug("检查存储桶存在性: bucket={}, exists={}", bucketName, exists);
+            return exists;
+        } catch (Exception e) {
+            log.error("检查存储桶存在性失败: bucket={}, error={}", bucketName, e.getMessage(), e);
+            throw StorageException.bucketOperationError(bucketName, "exists", e);
+        }
     }
 
     /**

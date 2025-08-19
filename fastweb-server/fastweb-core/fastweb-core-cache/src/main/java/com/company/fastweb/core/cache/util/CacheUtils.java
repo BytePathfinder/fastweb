@@ -22,7 +22,7 @@ public class CacheUtils {
     }
 
     public <T> T get(String cacheName, String key) {
-        return (T) getCache(name).map(cache -> cache.get(key)).map(Cache.ValueWrapper::get).orElse(null);
+        return (T) getCache(cacheName).map(cache -> cache.get(key)).map(Cache.ValueWrapper::get).orElse(null);
     }
 
     public void put(String cacheName, String key, Object value) {

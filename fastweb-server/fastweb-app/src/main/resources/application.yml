@@ -23,24 +23,43 @@ spring:
       path: /h2-console
 
   # Redis配置（可选，如果没有Redis会使用内存缓存）
-  redis:
-    host: localhost
-    port: 6379
-    password: 
-    database: 0
-    timeout: 3000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
-        max-wait: -1ms
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
 
   # Jackson配置
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
-    default-property-inclusion: non_null
+    default-property-inclusion: non-null
+
+# FastWeb 框架配置
+fastweb:
+  cache:
+    enabled: true
+    configs:
+      default:
+        expire-time: 3600
+        local:
+          enabled: true
+          initial-capacity: 100
+          maximum-size: 1000
+        redis:
+          enabled: false
+  storage:
+    local:
+      path: ./uploads
+      url-prefix: /api/storage/files
 
 # MyBatis-Plus配置
 mybatis-plus:
@@ -56,9 +75,9 @@ mybatis-plus:
       logic-delete-field: deleted
       logic-delete-value: 1
       logic-not-delete-value: 0
-      insert-strategy: not_null
-      update-strategy: not_null
-      select-strategy: not_null
+      insert-strategy: not-null
+      update-strategy: not-null
+      select-strategy: not-null
   mapper-locations: classpath*:/mapper/**/*.xml
   type-aliases-package: com.company.fastweb.**.model.po
 
@@ -66,7 +85,8 @@ mybatis-plus:
 sa-token:
   token-name: Authorization
   timeout: 2592000
-  activity-timeout: -1
+  # 活动超时时间已弃用，请使用 active-timeout 替代
+  active-timeout: -1
   is-concurrent: true
   is-share: true
   token-style: uuid
@@ -75,8 +95,8 @@ sa-token:
 # 日志配置
 logging:
   level:
-    com.company.fastweb: debug
-    org.springframework.security: debug
+    '[com.company.fastweb]': debug
+    '[org.springframework.security]': debug
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"
 
@@ -88,4 +108,4 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: when-authorized
