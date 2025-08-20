@@ -1,14 +1,12 @@
-package com.company.fastweb.core.storage.service;
+package com.company.fastweb.core.storage.model.vo;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 /**
- * 存储对象信息
+ * 文件上传响应视图对象
  *
  * @author FastWeb
  */
@@ -16,7 +14,12 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class StorageObject {
+public class FileUploadVO {
+
+    /**
+     * 文件访问URL
+     */
+    private String url;
 
     /**
      * 对象名称
@@ -39,27 +42,7 @@ public class StorageObject {
     private String contentType;
 
     /**
-     * ETag
+     * 上传时间戳
      */
-    private String etag;
-
-    /**
-     * 最后修改时间
-     */
-    private LocalDateTime lastModified;
-
-    /**
-     * 访问URL
-     */
-    private String url;
-
-    /**
-     * 是否为目录
-     */
-    private Boolean isDirectory;
-
-    /**
-     * 元数据
-     */
-    private java.util.Map<String, String> metadata;
+    private Long uploadTime;
 }

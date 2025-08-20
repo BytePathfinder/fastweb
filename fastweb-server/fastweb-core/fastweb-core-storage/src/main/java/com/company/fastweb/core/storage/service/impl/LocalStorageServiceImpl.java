@@ -1,23 +1,26 @@
 package com.company.fastweb.core.storage.service.impl;
 
-import com.company.fastweb.core.exception.BizException;
-import com.company.fastweb.core.storage.config.StorageProperties;
-import com.company.fastweb.core.storage.exception.StorageException;
-import com.company.fastweb.core.storage.service.StorageObject;
-import com.company.fastweb.core.storage.service.StorageService;
-import com.company.fastweb.core.storage.util.StorageRetryUtil;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.io.*;
-import java.nio.file.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+
+import com.company.fastweb.core.storage.config.StorageProperties;
+import com.company.fastweb.core.storage.exception.StorageException;
+import com.company.fastweb.core.storage.model.dto.FileInfoDTO;
+import com.company.fastweb.core.storage.service.StorageService;
+import com.company.fastweb.core.storage.util.StorageRetryUtil;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 本地存储服务实现
@@ -133,7 +136,7 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public FileInfo getFileInfo(String bucketName, String objectName) {
+    public FileInfoDTO getFileInfo(String bucketName, String objectName) {
         return StorageRetryUtil.executeWithRetry(() -> {
             try {
                 Path filePath = getBucketPath(bucketName).resolve(objectName);
@@ -149,7 +152,13 @@ public class LocalStorageServiceImpl implements StorageService {
                 String etag = "";
 
                 log.debug("获取文件信息成功: bucket={}, object={}, size={}", bucketName, objectName, size);
-                return new FileInfo(objectName, etag, size, lastModified, contentType);
+                return FileInfoDTO.builder()
+                        .objectName(objectName)
+                        .etag(etag)
+                        .size(size)
+                        .lastModified(lastModified)
+                        .contentType(contentType)
+                        .build();
 
             } catch (IOException e) {
                 log.error("获取文件信息失败: bucket={}, object={}, error={}", bucketName, objectName, e.getMessage(), e);
@@ -159,14 +168,14 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public FileInfo getFileInfo(String objectName) {
+    public FileInfoDTO getFileInfo(String objectName) {
         return getFileInfo(storageProperties.getDefaultBucket(), objectName);
     }
 
     @Override
-    public List<FileInfo> listFiles(String bucketName, String prefix, int maxKeys) {
+    public List<FileInfoDTO> listFiles(String bucketName, String prefix, int maxKeys) {
         return StorageRetryUtil.executeWithRetry(() -> {
-            List<FileInfo> files = new ArrayList<>();
+            List<FileInfoDTO> files = new ArrayList<>();
             try {
                 Path bucketPath = getBucketPath(bucketName);
                 if (!Files.exists(bucketPath)) {
@@ -188,7 +197,13 @@ public class LocalStorageServiceImpl implements StorageService {
                                 long size = Files.size(path);
                                 String lastModified = Files.getLastModifiedTime(path).toString();
                                 
-                                files.add(new FileInfo(objectName, "", size, lastModified, contentType));
+                                files.add(FileInfoDTO.builder()
+                                        .objectName(objectName)
+                                        .etag("")
+                                        .size(size)
+                                        .lastModified(lastModified)
+                                        .contentType(contentType)
+                                        .build());
                             } catch (IOException e) {
                                 log.warn("获取文件信息失败: path={}, error={}", path, e.getMessage());
                             }
@@ -204,7 +219,7 @@ public class LocalStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public List<FileInfo> listFiles(String prefix, int maxKeys) {
+    public List<FileInfoDTO> listFiles(String prefix, int maxKeys) {
         return listFiles(storageProperties.getDefaultBucket(), prefix, maxKeys);
     }
 

@@ -10,9 +10,11 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.company.fastweb.core.cache.service.CacheService;
+import com.company.fastweb.core.cache.model.dto.CacheStatisticsDTO;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
 
 /**
  * 缓存服务实现，优先使用 Redis；当 RedisTemplate 不存在时降级为本地 Map（仅用于开发测试）
@@ -269,5 +271,75 @@ public class CacheServiceImpl implements CacheService {
         
         String regex = pattern.replace("*", ".*");
         return key.matches(regex);
+    }
+
+    @Override
+    public CacheStatisticsDTO getStatistics() {
+        Object template = getRedisTemplate();
+        if (template != null) {
+            // Redis统计信息
+            try {
+                org.springframework.data.redis.core.RedisTemplate<String, Object> redisTemplate = 
+                    (org.springframework.data.redis.core.RedisTemplate<String, Object>) template;
+                
+                // 获取Redis信息（这里简化处理，实际可以通过Redis INFO命令获取更详细信息）
+                Set<String> keys = redisTemplate.keys("*");
+                long totalKeys = keys != null ? keys.size() : 0;
+                
+                return CacheStatisticsDTO.builder()
+                        .cacheType("redis")
+                        .totalKeys(totalKeys)
+                        .usedMemory(0L) // 需要通过Redis INFO命令获取
+                        .maxMemory(0L)
+                        .memoryUsageRate(0.0)
+                        .hitCount(0L)
+                        .missCount(0L)
+                        .hitRate(0.0)
+                        .connectionCount(1)
+                        .uptime(0L)
+                        .statisticsTime(LocalDateTime.now())
+                        .build();
+            } catch (Exception e) {
+                log.warn("获取Redis统计信息失败", e);
+            }
+        }
+        
+        // 本地缓存统计信息
+        return CacheStatisticsDTO.builder()
+                .cacheType("local")
+                .totalKeys((long) localCache.size())
+                .usedMemory(0L)
+                .maxMemory(0L)
+                .memoryUsageRate(0.0)
+                .hitCount(0L)
+                .missCount(0L)
+                .hitRate(0.0)
+                .connectionCount(0)
+                .uptime(0L)
+                .statisticsTime(LocalDateTime.now())
+                .build();
+    }
+
+    @Override
+    public long size() {
+        Object template = getRedisTemplate();
+        if (template != null) {
+            try {
+                org.springframework.data.redis.core.RedisTemplate<String, Object> redisTemplate = 
+                    (org.springframework.data.redis.core.RedisTemplate<String, Object>) template;
+                Set<String> keys = redisTemplate.keys("*");
+                return keys != null ? keys.size() : 0;
+            } catch (Exception e) {
+                log.warn("获取Redis缓存大小失败", e);
+                return 0;
+            }
+        }
+        return localCache.size();
+    }
+
+    @Override
+    public long size(String pattern) {
+        Set<String> keys = keys(pattern);
+        return keys.size();
     }
 }

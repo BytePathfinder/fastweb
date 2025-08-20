@@ -2,6 +2,7 @@ package com.company.fastweb.core.cache.service;
 
 import java.util.Map;
 import java.util.Set;
+import com.company.fastweb.core.cache.model.dto.CacheStatisticsDTO;
 
 /**
  * 缓存服务接口
@@ -112,4 +113,26 @@ public interface CacheService {
      * @return 是否存在
      */
     boolean hasKey(String key);
+
+    /**
+     * 获取缓存统计信息
+     * 
+     * @return 缓存统计信息
+     */
+    CacheStatisticsDTO getStatistics();
+
+    /**
+     * 获取缓存大小（键的数量）
+     * 
+     * @return 缓存大小
+     */
+    long size();
+
+    /**
+     * 获取缓存大小（指定模式）
+     * 
+     * @param pattern 匹配模式
+     * @return 匹配的键数量
+     */
+    long size(String pattern);
 }

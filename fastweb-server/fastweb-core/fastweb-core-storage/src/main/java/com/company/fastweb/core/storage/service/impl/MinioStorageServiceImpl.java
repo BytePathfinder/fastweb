@@ -1,8 +1,8 @@
 package com.company.fastweb.core.storage.service.impl;
 
 import com.company.fastweb.core.storage.exception.StorageException;
+import com.company.fastweb.core.storage.model.dto.FileInfoDTO;
 import com.company.fastweb.core.storage.service.StorageService;
-import com.company.fastweb.core.storage.service.StorageService.FileInfo;
 import com.company.fastweb.core.storage.util.StorageRetryUtil;
 import io.minio.*;
 import io.minio.errors.*;
@@ -174,7 +174,7 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public FileInfo getFileInfo(String bucketName, String objectName) {
+    public FileInfoDTO getFileInfo(String bucketName, String objectName) {
         return StorageRetryUtil.executeWithRetry(() -> {
             try {
                 StatObjectResponse stat = minioClient.statObject(
@@ -184,13 +184,13 @@ public class MinioStorageServiceImpl implements StorageService {
                         .build()
                 );
                 
-                FileInfo fileInfo = new FileInfo(
-                    objectName,
-                    stat.etag(),
-                    stat.size(),
-                    stat.lastModified().toString(),
-                    stat.contentType()
-                );
+                FileInfoDTO fileInfo = FileInfoDTO.builder()
+                        .objectName(objectName)
+                        .etag(stat.etag())
+                        .size(stat.size())
+                        .lastModified(stat.lastModified().toString())
+                        .contentType(stat.contentType())
+                        .build();
                 log.debug("获取文件信息成功: bucket={}, object={}, size={}", bucketName, objectName, stat.size());
                 return fileInfo;
             } catch (ErrorResponseException e) {
@@ -208,13 +208,13 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public FileInfo getFileInfo(String objectName) {
+    public FileInfoDTO getFileInfo(String objectName) {
         return getFileInfo(defaultBucket, objectName);
     }
 
     @Override
-    public List<FileInfo> listFiles(String bucketName, String prefix, int maxKeys) {
-        List<FileInfo> files = new ArrayList<>();
+    public List<FileInfoDTO> listFiles(String bucketName, String prefix, int maxKeys) {
+        List<FileInfoDTO> files = new ArrayList<>();
         try {
             Iterable<Result<Item>> results = minioClient.listObjects(
                 ListObjectsArgs.builder()
@@ -226,13 +226,13 @@ public class MinioStorageServiceImpl implements StorageService {
 
             for (Result<Item> result : results) {
                 Item item = result.get();
-                files.add(new FileInfo(
-                    item.objectName(),
-                    item.etag(),
-                    item.size(),
-                    item.lastModified().toString(),
-                    null // ListObjects不返回contentType
-                ));
+                files.add(FileInfoDTO.builder()
+                        .objectName(item.objectName())
+                        .etag(item.etag())
+                        .size(item.size())
+                        .lastModified(item.lastModified().toString())
+                        .contentType(null) // ListObjects不返回contentType
+                        .build());
             }
         } catch (Exception e) {
             log.error("列出文件失败: bucket={}, prefix={}", bucketName, prefix, e);
@@ -242,7 +242,7 @@ public class MinioStorageServiceImpl implements StorageService {
     }
 
     @Override
-    public List<FileInfo> listFiles(String prefix, int maxKeys) {
+    public List<FileInfoDTO> listFiles(String prefix, int maxKeys) {
         return listFiles(defaultBucket, prefix, maxKeys);
     }
 
